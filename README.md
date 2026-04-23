@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Slack Agentic Playground
 
-## Getting Started
+A faithful Slack clone built as a playground for redesigning the Slack input
+for AI agents. Phase 1 focuses on getting the current Slack experience right —
+the agentic redesign (context chips, unified `@` picker, real LLM calls via
+Anthropic) will layer on top in Phase 2.
 
-First, run the development server:
+## Running locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What's built (Phase 1)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Shell** — workspace rail, sidebar (Threads / Mentions / Saved / Drafts /
+  Agents / More + collapsible Channels and Direct messages sections), top bar
+  with search and history nav.
+- **Channels + DMs** — 6 channels, 4 DMs, 1 group DM, 8 seeded users with
+  avatars, statuses, and presence indicators.
+- **Message list** — Slack-style grouping within a 5-minute window, day
+  dividers, hover action bar, reactions with counts, thread preview rows, edited
+  indicator, file attachment tiles, rendered mrkdwn (`*bold*`, `_italic_`,
+  `` `code` ``, ` ```fences``` `, `> quote`, `@mentions`, `#channel refs`,
+  `:emoji:`).
+- **Composer** — formatting toolbar (bold, italic, strike, link, lists, quote,
+  inline + block code) with keyboard shortcuts, `+` attach menu, emoji picker,
+  per-conversation draft persistence, `Enter` sends / `Shift+Enter` newline.
+- **Four composer popovers**
+  - `@` — mention picker with `@channel` / `@here` / `@everyone` specials, fuzzy
+    search, keyboard nav.
+  - `#` — channel picker.
+  - `/` — slash command menu (`/remind`, `/dm`, `/huddle`, `/ask-agent`, …).
+  - `:` — inline emoji autocomplete.
+- **Threads** — right-side pane that opens on "Reply in thread" or on a thread
+  preview row; reuses the composer for replies.
+- **Quick switcher** — `⌘K` fuzzy switcher across channels + DMs.
 
-## Learn More
+All state is in-memory via [Zustand](https://github.com/pmndrs/zustand). No
+backend yet.
 
-To learn more about Next.js, take a look at the following resources:
+## Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Next.js 16 (App Router) + React 19 + TypeScript
+- Tailwind CSS v4 with Slack-matched design tokens in `app/globals.css`
+- Zustand for UI state
+- Lucide React for icons
+- `@floating-ui/react` (for future positioning work) + Framer Motion (for future
+  micro-interactions)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project layout
 
-## Deploy on Vercel
+```
+app/
+  layout.tsx, page.tsx, globals.css
+components/
+  shell/        WorkspaceRail, Sidebar, TopBar
+  channel/      ChannelHeader, MessageList, Message, FileAttachmentTile
+  composer/     Composer, MentionPicker, ChannelPicker, SlashMenu,
+                EmojiPicker, PlusMenu, PopoverShell
+  thread/       ThreadPane
+  Avatar.tsx, QuickSwitcher.tsx
+lib/
+  types.ts, mockData.ts, store.ts, format.ts
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Phase 2 (upcoming)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The composer is the hero surface. Once Phase 1 is signed off, Phase 2 will
+redesign the input for AI agents:
+
+1. **Context chips** — pills above the composer showing exactly what the agent
+   can "see" (channels, threads, files, time ranges); removable and editable.
+2. **Unified `@` picker** — one mental model: `@agent` switches agents,
+   `@#channel` adds channel context, `@person` pulls their messages, `@file`
+   attaches.
+3. **Real streaming responses** — wire to the Anthropic Messages API via a
+   `/api/agent` route; render agent replies with a small subset of Slack's
+   Block Kit (section / header / context / actions).
+
+Context and direction came from a take-home prompt: _"Redesign the Slack input
+so it feels fast, intuitive, and powerful when AI agents are first-class."_
