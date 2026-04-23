@@ -1,26 +1,182 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-sans: var(--font-lato), "Slack-Lato", "Lato", "Helvetica Neue",
+    Helvetica, "Segoe UI", Tahoma, Arial, sans-serif;
+
+  /* Slack aubergine sidebar palette */
+  --color-slack-aubergine: #19171d;
+  --color-slack-aubergine-hover: #27242c;
+  --color-slack-aubergine-active: #1164a3;
+  --color-slack-aubergine-border: #2c2d30;
+  --color-slack-rail: #3f0e40;
+  --color-slack-rail-hover: #350d36;
+
+  /* Main pane */
+  --color-slack-pane: #ffffff;
+  --color-slack-pane-alt: #f8f8f8;
+  --color-slack-pane-hover: #f6f6f6;
+  --color-slack-border: #e1e1e1;
+  --color-slack-border-strong: #d1d1d1;
+
+  /* Text */
+  --color-slack-text: #1d1c1d;
+  --color-slack-text-muted: #616061;
+  --color-slack-text-light: #868686;
+  --color-slack-text-on-dark: #d1d2d3;
+  --color-slack-text-on-dark-muted: #9a9b9e;
+
+  /* Accent */
+  --color-slack-blue: #1264a3;
+  --color-slack-blue-hover: #0b4c8c;
+  --color-slack-green: #007a5a;
+  --color-slack-green-hover: #148567;
+  --color-slack-yellow: #ecb22e;
+  --color-slack-red: #e01e5a;
+  --color-slack-purple: #4a154b;
+
+  /* States */
+  --color-slack-mention: #f2c744;
+  --color-slack-unread: #ffffff;
+  --color-slack-link: #1264a3;
+  --color-slack-quote: #1d1c1d;
+
+  /* Reaction pill */
+  --color-slack-reaction-bg: #e8f5fa;
+  --color-slack-reaction-border: #1d9bd1;
+  --color-slack-reaction-idle-bg: #f8f8f8;
+  --color-slack-reaction-idle-border: #dddddd;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.46668;
+}
+
+/* Custom scrollbars that match Slack's look */
+.slack-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.slack-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.slack-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.slack-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.slack-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.slack-scroll-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+.slack-scroll-light::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.slack-scroll-light::-webkit-scrollbar-track {
+  background: transparent;
+}
+.slack-scroll-light::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Composer contenteditable */
+.composer-input[contenteditable="true"]:empty::before {
+  content: attr(data-placeholder);
+  color: #868686;
+  pointer-events: none;
+}
+
+.composer-input {
+  outline: none;
+}
+
+.composer-input code {
+  font-family: Monaco, Menlo, Consolas, "Courier New", monospace;
+  background: #f4f4f4;
+  border: 1px solid #e1e1e1;
+  color: #e01e5a;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.composer-input pre {
+  font-family: Monaco, Menlo, Consolas, "Courier New", monospace;
+  background: #f4f4f4;
+  border: 1px solid #e1e1e1;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 4px 0;
+}
+
+.composer-input blockquote {
+  border-left: 4px solid #1d1c1d;
+  padding-left: 8px;
+  margin: 2px 0;
+  color: #1d1c1d;
+}
+
+.composer-input ul,
+.composer-input ol {
+  padding-left: 20px;
+  margin: 2px 0;
+}
+.composer-input ul {
+  list-style-type: disc;
+}
+.composer-input ol {
+  list-style-type: decimal;
+}
+
+.composer-input .mention,
+.composer-input .channel-ref {
+  background: rgba(29, 155, 209, 0.1);
+  color: #1264a3;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+.composer-input a {
+  color: #1264a3;
+  text-decoration: underline;
+}
+
+/* Hover action reveal */
+.message-row .message-actions {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.message-row:hover .message-actions,
+.message-row:focus-within .message-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.message-row:hover {
+  background: #f8f8f8;
 }
