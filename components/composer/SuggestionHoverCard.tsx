@@ -139,14 +139,14 @@ export function SuggestionHoverCard({
           <button
             onClick={handleConnect}
             disabled={connecting}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded bg-[#007a5a] px-2 text-[13px] font-bold text-white transition-colors hover:bg-[#148567] disabled:opacity-80"
+            className="flex h-8 w-full items-center justify-center gap-1.5 rounded border border-slack-border bg-white px-2 text-[13px] font-bold text-slack-text transition-colors hover:bg-slack-pane-hover disabled:opacity-70"
           >
             {connecting ? (
               <>
                 <Loader2
                   size={14}
                   strokeWidth={2.4}
-                  className="animate-spin"
+                  className="animate-spin text-slack-text-muted"
                 />
                 Connecting to {agent.displayName}…
               </>
