@@ -63,6 +63,11 @@ const LOGOS = {
   chorus: "https://www.google.com/s2/favicons?domain=chorus.ai&sz=256",
 } as const;
 
+/** All agent logo URLs, exposed so the root layout can preload them. Logos
+ * are hosted on third-party CDNs, so without preload the very first chip
+ * render shows a blank box for a beat while the browser fetches. */
+export const AGENT_LOGO_URLS: ReadonlyArray<string> = Object.values(LOGOS);
+
 export const AGENTS: AgentMeta[] = [
   {
     id: "_gong",
