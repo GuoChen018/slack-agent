@@ -117,7 +117,7 @@ export function EmojiPicker({ rect, query = "", inline, onPick, onClose }: Props
   // Anchored to emoji button — render absolute above the composer footer
   return (
     <div
-      className="absolute z-50 w-[320px] overflow-hidden rounded-lg border border-slack-border bg-white shadow-xl"
+      className="shadow-popover absolute z-50 w-[320px] overflow-hidden rounded-lg bg-white"
       style={{ bottom: "120%", left: 0 }}
       onMouseDown={(e) => e.stopPropagation()}
     >

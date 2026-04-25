@@ -54,7 +54,7 @@ export function SuggestionHoverCard({
     <div
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className="animate-hover-card-in fixed z-[60] overflow-hidden rounded-lg border border-slack-border bg-white shadow-md"
+      className="animate-hover-card-in shadow-popover fixed z-[60] overflow-hidden rounded-lg bg-white"
       style={positionStyle}
     >
       <div className="flex items-center gap-3 px-4 pt-4 pb-2">

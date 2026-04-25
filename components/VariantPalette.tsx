@@ -118,7 +118,7 @@ export function VariantPalette() {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[640px] overflow-hidden rounded-lg border border-slack-border bg-white shadow-2xl"
+        className="shadow-modal w-[640px] overflow-hidden rounded-lg bg-white"
       >
         <div className="flex items-center gap-2 border-b border-slack-border px-3 py-2">
           <Search size={16} className="text-slack-text-muted" />

@@ -33,7 +33,7 @@ export function PlusMenu({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={ref}
-      className="absolute bottom-[120%] left-0 z-50 w-[260px] overflow-hidden rounded-lg border border-slack-border bg-white shadow-md"
+      className="shadow-popover absolute bottom-[120%] left-0 z-50 w-[260px] overflow-hidden rounded-lg bg-white"
     >
       <ul className="py-1">
         {items.map(({ icon: Icon, label }) => (

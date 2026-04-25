@@ -240,7 +240,7 @@ export function MessageRow({
 
       {/* Hover action bar — not shown on the thread parent */}
       {!isThreadParent && (
-      <div className="message-actions pointer-events-none absolute -top-3 right-5 flex h-8 items-center rounded-md border border-slack-border bg-white shadow-sm">
+      <div className="message-actions shadow-popover pointer-events-none absolute -top-3 right-5 flex h-8 items-center rounded-md bg-white">
         {QUICK_REACTIONS.slice(0, 3).map((e) => (
           <button
             key={e}

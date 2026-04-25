@@ -48,7 +48,7 @@ export function PopoverShell({
     <div
       ref={ref}
       role="listbox"
-      className="fixed z-50 overflow-hidden rounded-lg border border-slack-border bg-white shadow-xl"
+      className="shadow-popover fixed z-50 overflow-hidden rounded-lg bg-white"
       style={{ bottom, left, width, maxHeight }}
     >
       {children}
