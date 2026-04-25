@@ -115,6 +115,43 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
   );
   const threadDismissed = !!threadParentId && !!dismissedThreads[threadParentId];
 
+  const allMessages = useSlackStore((s) => s.messages);
+  const allUsers = useSlackStore((s) => s.users);
+  // Agents that have already authored a message in this conversation (top
+  // level OR thread replies) are considered "established" — the user knows
+  // they exist and how to reach them, so we suppress them from auto-
+  // suggestions. Stops the strip from re-pitching Agentforce when the user
+  // is reporting back ("Hi team, I just updated Salesforce…") about an
+  // action the agent already completed.
+  const establishedAgentIds = useMemo(() => {
+    const ids: Record<string, true> = {};
+    for (const m of Object.values(allMessages)) {
+      if (m.ephemeralFor) continue;
+      // Top-level message in this channel, or a thread reply whose parent
+      // lives in this channel.
+      const inChannel =
+        m.conversationId === convId ||
+        (m.threadId && allMessages[m.threadId]?.conversationId === convId);
+      if (!inChannel) continue;
+      const author = allUsers[m.authorId];
+      if (author?.isAgent) ids[m.authorId] = true;
+    }
+    return ids;
+  }, [allMessages, allUsers, convId]);
+  const establishedAgentIdsRef = useRef(establishedAgentIds);
+  useEffect(() => {
+    establishedAgentIdsRef.current = establishedAgentIds;
+    // If an agent just established itself (e.g., posted a thread reply
+    // while the user was typing), drop any currently-shown chip for that
+    // agent on the next tick. We re-filter the live `suggested` list
+    // directly here rather than going through `scheduleSuggestions` to
+    // avoid replaying the whole debounce cycle.
+    setSuggested((prev) => {
+      const next = prev.filter((a) => !establishedAgentIds[a.id]);
+      return next.length === prev.length ? prev : next;
+    });
+  }, [establishedAgentIds]);
+
   const draftKey = agentId
     ? `agent_${agentId}`
     : threadParentId
@@ -674,11 +711,17 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     // dismissed until the draft resets.
     if (suggestStateRef.current === "dismissed") return;
     // Drop any currently-shown chip whose agent the user just @-mentioned
-    // themselves. Done synchronously here so the chip disappears the same
-    // tick the mention lands, not after the suggestion debounce.
-    if (mentionedAgentIds.size > 0 && suggestedRef.current.length > 0) {
+    // themselves, OR whose agent has already established itself in this
+    // conversation by replying somewhere above. Done synchronously here so
+    // the chip disappears the same tick its disqualifier lands, not after
+    // the suggestion debounce.
+    const established = establishedAgentIdsRef.current;
+    if (
+      (mentionedAgentIds.size > 0 || Object.keys(established).length > 0) &&
+      suggestedRef.current.length > 0
+    ) {
       const filtered = suggestedRef.current.filter(
-        (a) => !mentionedAgentIds.has(a.id),
+        (a) => !mentionedAgentIds.has(a.id) && !established[a.id],
       );
       if (filtered.length !== suggestedRef.current.length) {
         setSuggested(filtered);
@@ -707,9 +750,10 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       // Threads are an opt-in surface (the user opened it intentionally) and
       // the heuristic is less likely to land 2 hits on a passive context
       // sentence than on a freshly-typed action sentence.
+      const established = establishedAgentIdsRef.current;
       const candidates = suggestAgentsForDraft(liveSource, {
         minScore: seedingFromParent ? 1 : 2,
-      }).filter((a) => !liveMentionedIds.has(a.id));
+      }).filter((a) => !liveMentionedIds.has(a.id) && !established[a.id]);
       const prev = suggestedRef.current;
       const nextKey = candidates.map((a) => a.id).sort().join(",");
       const prevKey = prev.map((a) => a.id).sort().join(",");
