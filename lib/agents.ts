@@ -478,14 +478,16 @@ export function suggestAgentsForDraft(
     if (score >= minScore) scored.push({ agent, score });
   }
   scored.sort((a, b) => b.score - a.score);
-  // Only include agents within 1 point of the top score. Without this we
-  // end up showing a clear-best agent (e.g. Agentforce on a "update the
-  // Salesforce opportunity" draft) alongside a tangential match (Gong
-  // catching `call` + `Acme`). Multi-agent suggestions only fire when two
-  // or more agents are genuinely close in relevance.
+  // The leader always shows. Secondary agents need to be both within 1 point
+  // of the leader AND score >= 3 — i.e. genuinely strong on their own merits,
+  // not just barely clearing minScore. Without this, a clear leader like
+  // Agentforce (score 4 on a "update the Salesforce opportunity" draft) ends
+  // up paired with a tangential match like Gong (score 2 on `call`+`Acme`),
+  // which felt noisy. Multi-agent suggestions still fire when two agents
+  // tie or both clear the score-3 bar.
   const top = scored[0]?.score ?? 0;
   return scored
-    .filter((x) => x.score >= top - 1)
+    .filter((x, i) => i === 0 || (x.score >= top - 1 && x.score >= 3))
     .slice(0, max)
     .map((x) => x.agent);
 }

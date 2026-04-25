@@ -758,7 +758,27 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       const nextKey = candidates.map((a) => a.id).sort().join(",");
       const prevKey = prev.map((a) => a.id).sort().join(",");
       if (nextKey === prevKey) return; // no change, no flash
-      if (candidates.length === 0) return; // sticky: keep what's showing
+      if (candidates.length === 0) {
+        // No qualifying matches. Sticky-preserve only if the previously
+        // shown chips are *still candidates the engine would surface* —
+        // that protects against flicker when the user is mid-typing and
+        // briefly drops below the score threshold. If the previous chips
+        // include an agent the engine no longer surfaces (e.g. it's now
+        // established in the channel, or the draft has shifted toward a
+        // single-agent answer), let the strip clear instead of holding
+        // onto stale matches.
+        const prevStillValid = prev.every(
+          (a) =>
+            !established[a.id] &&
+            !liveMentionedIds.has(a.id) &&
+            suggestAgentsForDraft(liveSource, {
+              minScore: seedingFromParent ? 1 : 2,
+            }).some((c) => c.id === a.id),
+        );
+        if (prevStillValid) return;
+        setSuggested([]);
+        return;
+      }
       const isFirstReveal = prev.length === 0;
       setSuggested(candidates);
       setSuggestState("ready");
