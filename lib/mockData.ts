@@ -154,9 +154,10 @@ export const users: User[] = [
     name: "Slackbot",
     displayName: "Slackbot",
     handle: "slackbot",
-    avatarColor: AVATAR_COLORS.G,
+    avatarColor: "#FFFFFF",
     presence: "active",
     isBot: true,
+    avatarUrl: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/avatars/slackbot.png`,
   },
   {
     id: "u_agent",

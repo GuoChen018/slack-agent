@@ -8,6 +8,12 @@ const isPages = process.env.GITHUB_PAGES === "true";
 const repoName = process.env.GITHUB_PAGES_BASE ?? "slack-agent";
 
 const nextConfig: NextConfig = {
+  // Surface the basePath to client code so we can prefix raw `<img src>`
+  // values that point at /public assets (Next only auto-prefixes its own
+  // <Image>, not raw imgs). Empty string in dev keeps URLs working at /.
+  env: {
+    NEXT_PUBLIC_BASE_PATH: isPages ? `/${repoName}` : "",
+  },
   ...(isPages
     ? {
         output: "export",

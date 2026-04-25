@@ -28,11 +28,10 @@ export function Avatar({
   const textColor = isLight(bg) ? "#1d1c1d" : "#ffffff";
   // If the remote logo 404s we drop back to the colored-initials chip.
   const [imgFailed, setImgFailed] = useState(false);
-  // Agents are flagged as bots so the AGENT badge renders in messages, but
-  // they still want their logo. Only suppress photos for plain bot/app users
-  // that aren't agents.
-  const showPhoto =
-    !!user.avatarUrl && !imgFailed && (!user.isBot || !!user.isAgent);
+  // Show the photo whenever an avatarUrl was explicitly provided. Agents and
+  // a few special bots (Slackbot) ship custom artwork; plain humans without
+  // a photo still fall through to initials.
+  const showPhoto = !!user.avatarUrl && !imgFailed;
   const isAgentLogo = showPhoto && user.isAgent;
   const style = {
     width: size,
