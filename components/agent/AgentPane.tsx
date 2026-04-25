@@ -397,10 +397,14 @@ function SetupScreen({
   agent: AgentMeta;
   onInstall: () => void;
 }) {
+  // Per-user OAuth scopes — "your" not "workspace". This is the same pattern
+  // Slack apps use today (e.g. Cursor, Linear, GitHub) where the workspace
+  // install is admin-handled and each user links their own account once
+  // before the agent can act on their behalf.
   const scopes = [
-    `Read your ${agent.displayName} data on accounts you own`,
-    `Take actions in ${agent.displayName} on your behalf`,
-    "Post messages in channels you're already in",
+    `Act on your behalf in ${agent.displayName}`,
+    `Read records you have access to in ${agent.displayName}`,
+    `Reply in Slack channels you're already in`,
   ];
   return (
     <div className="flex h-full flex-col items-start justify-end px-5 pt-8 pb-6">
@@ -414,7 +418,8 @@ function SetupScreen({
         </span>
       </div>
       <p className="mt-1 text-[13px] text-slack-text-muted">
-        Connect {agent.displayName} to your workspace to get started.
+        Link your {agent.displayName} account so it can act on your behalf
+        from Slack.
       </p>
 
       <ul className="mt-5 w-full space-y-2">
@@ -434,11 +439,11 @@ function SetupScreen({
         onClick={onInstall}
         className="mt-6 flex h-9 items-center justify-center rounded bg-[#007a5a] px-4 text-[14px] font-bold text-white hover:bg-[#148567]"
       >
-        Add to Slack
+        Link Account
       </button>
       <p className="mt-3 text-[11px] leading-snug text-slack-text-muted">
-        By installing, you agree to {agent.displayName}'s terms of service and
-        privacy policy. You can revoke access at any time.
+        You'll be redirected to {agent.displayName} to sign in. You can revoke
+        access at any time from Slack settings.
       </p>
     </div>
   );
