@@ -67,6 +67,37 @@ export interface Message {
    * Drives the per-agent status indicator in the thread UI. `queued` means
    * the agent is waiting for a previous agent to finish before it starts. */
   agentStatus?: "queued" | "thinking" | "streaming" | "done";
+  /** Ephemeral messages are only visible to the user identified by
+   *  `ephemeralFor`. We use them for two flows today:
+   *    - The Slackbot preflight that intercepts a Send when an `@agent`
+   *      mention isn't yet connected to the user's account. Carries the
+   *      original draft + the list of unconnected agents so the user can
+   *      Connect (and auto-post), Send anyway (and trigger the realistic
+   *      in-thread connect prompt), or Edit (return the draft to the
+   *      composer).
+   *    - The agent's in-thread "you haven't connected me yet" reply that
+   *      appears after a user clicks Send anyway from the preflight. */
+  ephemeralFor?: UserId;
+  preflight?: {
+    draftText: string;
+    draftHtml?: string;
+    unconnectedAgentIds: UserId[];
+    threadParentId?: MessageId;
+  };
+  /** When set, this ephemeral row is the agent's in-thread connect prompt;
+   *  clicking Connect should retroactively run `runAfterConnect` against the
+   *  parent message in the thread. The label is shown on the prompt button
+   *  (e.g., "Connect Agentforce"). */
+  agentConnectPrompt?: {
+    agentId: UserId;
+    /** Mrkdwn the prompt body should render. */
+    body: string;
+    /** Action to run on the parent message after the user connects. */
+    runAfterConnect: {
+      kind: "agent_action";
+      actionId: string;
+    };
+  };
 }
 
 export interface DraftState {

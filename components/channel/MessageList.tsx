@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useSlackStore } from "@/lib/store";
 import { formatDayDivider } from "@/lib/format";
 import { MessageRow } from "./Message";
+import { PreflightEphemeral } from "./PreflightEphemeral";
 import { Hash, Lock } from "lucide-react";
 
 export function MessageList() {
@@ -43,6 +44,15 @@ export function MessageList() {
       );
       lastDay = dayLabel;
       prevAuthor = null;
+    }
+
+    if (msg.preflight) {
+      // Slackbot preflight ephemeral never groups with the previous author
+      // and shouldn't reset author tracking — render it as its own row
+      // and continue with prevAuthor unchanged so the next real message
+      // groups correctly with whatever came before the preflight.
+      rows.push(<PreflightEphemeral key={msg.id} message={msg} />);
+      continue;
     }
 
     const compact =

@@ -10,6 +10,25 @@ export function renderMrkdwn(
   conversationsByName: Record<string, { id: string; name: string }>,
 ): string {
   if (!text) return "";
+
+  // Pre-pass: extract Slack-style `<url|label>` link tokens before we escape
+  // anything, since both `<` and `|` would otherwise be mangled. We swap in
+  // sentinels and re-insert the rendered <a> tags at the very end so the
+  // bare-URL auto-linkifier below doesn't double-wrap our hrefs.
+  const linkSlots: string[] = [];
+  text = text.replace(
+    /<((?:https?:\/\/)[^|\s>]+)\|([^>]+)>/g,
+    (_m, url: string, label: string) => {
+      const idx = linkSlots.length;
+      const safeUrl = escapeHtml(url);
+      const safeLabel = escapeHtml(label);
+      linkSlots.push(
+        `<a href="${safeUrl}" target="_blank" rel="noreferrer">${safeLabel}</a>`,
+      );
+      return `\u0000LINK${idx}\u0000`;
+    },
+  );
+
   let safe = escapeHtml(text);
 
   // Code blocks ```...``` first
@@ -64,6 +83,14 @@ export function renderMrkdwn(
 
   // Newlines → <br>, but skip inside <pre>/<blockquote>
   safe = safe.replace(/\n/g, "<br/>");
+
+  // Restore the pre-extracted <url|label> link tokens.
+  if (linkSlots.length) {
+    safe = safe.replace(/\u0000LINK(\d+)\u0000/g, (_m, idx) => {
+      const i = Number(idx);
+      return linkSlots[i] ?? "";
+    });
+  }
 
   return safe;
 }

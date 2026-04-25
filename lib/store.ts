@@ -140,12 +140,43 @@ interface SlackState {
   closeThread: () => void;
 
   sendMessage: (text: string, opts?: { html?: string; threadParentId?: MessageId }) => MessageId;
+  /** Post a Slackbot-style ephemeral preflight that intercepts a Send when
+   *  the draft @-mentions an agent the user hasn't connected yet. Returns
+   *  the new ephemeral message id. */
+  postPreflightEphemeral: (args: {
+    text: string;
+    html?: string;
+    unconnectedAgentIds: UserId[];
+    threadParentId?: MessageId;
+  }) => MessageId;
+  /** Remove an ephemeral message (used when the user resolves a preflight
+   *  via Connect / Send anyway / Edit). */
+  removeEphemeral: (id: MessageId) => void;
+  /** Resolve a preflight by sending the underlying public message. Used
+   *  from both the "Connect Account → auto-send" and the "Send anyway"
+   *  paths; the latter also schedules the in-thread connect prompts. */
+  resolvePreflight: (id: MessageId, mode: "connect" | "send-anyway") => void;
+  /** Mark an agent as connected, then immediately re-trigger the action
+   *  that the user originally tried to run on the parent message. */
+  connectAndRunOnParent: (
+    parentId: MessageId,
+    agentId: UserId,
+    actionId: string,
+  ) => void;
   editMessage: (id: MessageId, text: string) => void;
   deleteMessage: (id: MessageId) => void;
 
   toggleReaction: (id: MessageId, emoji: string) => void;
 
   setDraft: (key: ConversationId | "thread", draft: DraftState) => void;
+  /** Per-key counter incremented whenever an external action (today only
+   *  the Edit button on an ephemeral preflight) wants the composer to
+   *  rehydrate its DOM from the stored draft, even though `draftKey`
+   *  hasn't changed. The composer effect watches this counter. */
+  draftRehydrateNonce: Record<string, number>;
+  /** Bump the rehydrate nonce for `key`, forcing the matching composer
+   *  to re-load `draft.html` into its contentEditable. */
+  requestDraftRehydrate: (key: ConversationId | "thread") => void;
   clearDraft: (key: ConversationId | "thread") => void;
 
   setSectionCollapsed: (section: string, collapsed: boolean) => void;
@@ -197,6 +228,7 @@ export const useSlackStore = create<SlackState>((set, get) => ({
   openThreadParentId: null,
 
   drafts: {},
+  draftRehydrateNonce: {},
   unread: {
     c_general: 2,
     dm_decio: 1,
@@ -448,17 +480,165 @@ export const useSlackStore = create<SlackState>((set, get) => ({
     // thread — the parent's reply preview (avatar stack + count) is the
     // affordance for the user to peek in.
     const mentionedAgentIds = extractAgentMentionIds(opts?.html ?? "", text);
-    if (mentionedAgentIds.length > 0) {
+    // Only agents whose accounts are connected actually run. Unconnected
+    // agents stay silent here; if the user reached this path via "Send
+    // anyway", resolvePreflight will drop an ephemeral connect prompt for
+    // each of them in the resulting thread.
+    const setup = get().agentSetupComplete;
+    const runnableAgentIds = mentionedAgentIds.filter((aid) => setup[aid]);
+    if (runnableAgentIds.length > 0) {
       const threadParentId = opts?.threadParentId ?? id;
       scheduleAgentThreadReplies(
         get,
         set,
         threadParentId,
-        mentionedAgentIds,
+        runnableAgentIds,
         text,
       );
     }
     return id;
+  },
+
+  postPreflightEphemeral: ({ text, html, unconnectedAgentIds, threadParentId }) => {
+    const state = get();
+    const id: MessageId = `m_eph_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const message: Message = {
+      id,
+      conversationId: state.activeConversationId,
+      // We attribute the preflight to Slackbot. The render path renders this
+      // specially anyway based on `preflight`, but using Slackbot keeps the
+      // avatar/name fallback honest.
+      authorId: "u_slackbot",
+      text: "",
+      createdAt: Date.now(),
+      reactions: [],
+      threadId: threadParentId,
+      ephemeralFor: state.currentUserId,
+      preflight: {
+        draftText: text,
+        draftHtml: html,
+        unconnectedAgentIds,
+        threadParentId,
+      },
+    };
+    set((s) => {
+      const messages = { ...s.messages, [id]: message };
+      let messageIdsByConversation = s.messageIdsByConversation;
+      if (!threadParentId) {
+        const convIds = s.messageIdsByConversation[state.activeConversationId] ?? [];
+        messageIdsByConversation = {
+          ...s.messageIdsByConversation,
+          [state.activeConversationId]: [...convIds, id],
+        };
+      }
+      return { messages, messageIdsByConversation };
+    });
+    return id;
+  },
+
+  removeEphemeral: (id) =>
+    set((s) => {
+      const msg = s.messages[id];
+      if (!msg) return s;
+      const nextMsgs = { ...s.messages };
+      delete nextMsgs[id];
+      const ids = s.messageIdsByConversation[msg.conversationId] ?? [];
+      return {
+        messages: nextMsgs,
+        messageIdsByConversation: {
+          ...s.messageIdsByConversation,
+          [msg.conversationId]: ids.filter((x) => x !== id),
+        },
+      };
+    }),
+
+  resolvePreflight: (id, mode) => {
+    const state = get();
+    const eph = state.messages[id];
+    if (!eph?.preflight) return;
+    const { draftText, draftHtml, unconnectedAgentIds, threadParentId } =
+      eph.preflight;
+    // Drop the ephemeral first so the preflight UI disappears even if the
+    // downstream sendMessage / agent prompt schedules async work.
+    get().removeEphemeral(id);
+    if (mode === "connect") {
+      // The user already saw the preflight and chose to connect. Mark every
+      // affected agent as set up, then post the public message — the agents
+      // can now run normally in the resulting thread.
+      set((s) => {
+        const next = { ...s.agentSetupComplete };
+        for (const aid of unconnectedAgentIds) next[aid] = true;
+        return { agentSetupComplete: next };
+      });
+      get().sendMessage(draftText, { html: draftHtml, threadParentId });
+      return;
+    }
+    // mode === "send-anyway": post publicly so the team sees the message,
+    // then schedule each unconnected agent to drop an ephemeral connect
+    // prompt into the resulting thread (only visible to the sender). Once
+    // the user connects from there, we retroactively run the agent's
+    // intended action against the parent.
+    const newMsgId = get().sendMessage(draftText, {
+      html: draftHtml,
+      threadParentId,
+    });
+    const parentForReplies = threadParentId ?? newMsgId;
+    // Stagger the prompts slightly so they appear in a natural order rather
+    // than all popping in at once, and so the parent's "thinking" agent
+    // status pills (scheduled by sendMessage) get to render first.
+    unconnectedAgentIds.forEach((aid, idx) => {
+      const delay = 600 + idx * 250;
+      window.setTimeout(() => {
+        const me = get().currentUserId;
+        const promptId: MessageId = `m_eph_${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2, 6)}`;
+        const agent = AGENTS_BY_ID[aid];
+        if (!agent) return;
+        const promptMsg: Message = {
+          id: promptId,
+          conversationId: state.activeConversationId,
+          authorId: aid,
+          text: "",
+          createdAt: Date.now(),
+          reactions: [],
+          threadId: parentForReplies,
+          ephemeralFor: me,
+          agentConnectPrompt: {
+            agentId: aid,
+            body: `I'd love to help, but your ${agent.displayName} account isn't linked yet. Connect once and I'll pick this up — only you can see this message.`,
+            runAfterConnect: {
+              kind: "agent_action",
+              // Heuristic: pick the first contextual action whose triggers
+              // match the original draft. This keeps the demo's
+              // "retroactively run" promise intact without hard-coding.
+              actionId:
+                AGENTS_BY_ID[aid]?.contextualActions?.find((a) =>
+                  a.triggers?.some((t) => t.test(draftText)),
+                )?.id ??
+                AGENTS_BY_ID[aid]?.contextualActions?.[0]?.id ??
+                "",
+            },
+          },
+        };
+        set((s) => ({ messages: { ...s.messages, [promptId]: promptMsg } }));
+      }, delay);
+    });
+  },
+
+  connectAndRunOnParent: (parentId, agentId) => {
+    set((s) => ({
+      agentSetupComplete: { ...s.agentSetupComplete, [agentId]: true },
+    }));
+    // Replay the agent's normal channel-reply flow against the parent's text.
+    // The agent posts into the same public thread, so the team sees the
+    // (now successful) outcome. We deliberately don't try to recreate the
+    // proposal/confirm right-pane flow here — the channel reply gives a
+    // sufficient signal that the agent ran, and the user can keep iterating
+    // in the DM if they want the full propose-and-confirm experience.
+    const parent = get().messages[parentId];
+    const draftText = parent?.text ?? "";
+    scheduleAgentThreadReplies(get, set, parentId, [agentId], draftText);
   },
 
   editMessage: (id, text) =>
@@ -510,6 +690,13 @@ export const useSlackStore = create<SlackState>((set, get) => ({
 
   setDraft: (key, draft) =>
     set((s) => ({ drafts: { ...s.drafts, [key]: draft } })),
+  requestDraftRehydrate: (key) =>
+    set((s) => ({
+      draftRehydrateNonce: {
+        ...s.draftRehydrateNonce,
+        [key]: (s.draftRehydrateNonce[key] ?? 0) + 1,
+      },
+    })),
   clearDraft: (key) =>
     set((s) => {
       const next = { ...s.drafts };

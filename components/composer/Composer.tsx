@@ -50,6 +50,39 @@ interface TriggerState {
 }
 type Trigger = TriggerState | null;
 
+/** Walk the composer's contentEditable DOM and produce a Slack-mrkdwn-flavored
+ *  text payload. We mostly mirror `innerText`, but anchors that the user
+ *  created via paste-onto-selection get serialized as `<url|label>` so the
+ *  link survives through the wire format. (The mention/channel pills are
+ *  already represented as text via the @handle / #name characters they hold.)
+ */
+function serializeComposerToMrkdwn(root: HTMLElement): string {
+  const walk = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "br") return "\n";
+    if (tag === "a" && el.hasAttribute("data-composer-link")) {
+      const href = (el as HTMLAnchorElement).getAttribute("href") ?? "";
+      const label = el.textContent ?? "";
+      if (href && label) return `<${href}|${label}>`;
+      return label;
+    }
+    let acc = "";
+    for (const child of Array.from(el.childNodes)) acc += walk(child);
+    // Block-ish elements should add a trailing newline so paragraphs from
+    // Shift+Enter end up as separate lines.
+    if (tag === "div" || tag === "p") acc += "\n";
+    return acc;
+  };
+  let out = "";
+  for (const child of Array.from(root.childNodes)) out += walk(child);
+  return out.replace(/\n+$/g, "");
+}
+
 interface Props {
   threadParentId?: string;
   /** When set, the composer routes sends through `askAgent` instead of
@@ -66,6 +99,8 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
   const sendMessage = useSlackStore((s) => s.sendMessage);
   const askAgent = useSlackStore((s) => s.askAgent);
   const amendAgentProposal = useSlackStore((s) => s.amendAgentProposal);
+  const agentSetupComplete = useSlackStore((s) => s.agentSetupComplete);
+  const postPreflightEphemeral = useSlackStore((s) => s.postPreflightEphemeral);
   const drafts = useSlackStore((s) => s.drafts);
   const setDraft = useSlackStore((s) => s.setDraft);
   const clearDraft = useSlackStore((s) => s.clearDraft);
@@ -182,6 +217,13 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     return `Message ${names}`;
   }, [placeholder, conv, threadParentId, agentId, users, currentUserId]);
 
+  // External rehydrate signal: the Edit button on a preflight ephemeral
+  // pushes the draft back into the store and bumps this nonce so the
+  // composer reloads the draft DOM even though `draftKey` didn't change.
+  const rehydrateNonce = useSlackStore(
+    (s) => s.draftRehydrateNonce[draftKey] ?? 0,
+  );
+
   // Load draft into contenteditable when key changes. Intentionally only depends
   // on draftKey so typing doesn't re-apply the persisted HTML on every keystroke.
   // We also reset the suggestion machine here so a fresh conversation starts
@@ -197,6 +239,18 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     // would stay stuck at "idle" until the user typed another character.
     if (inputRef.current.innerText.trim().length > 0) {
       scheduleSuggestions();
+      // Move caret to the end of the rehydrated draft so the user can keep
+      // typing immediately. Otherwise the caret defaults to the start of
+      // the contenteditable, which is confusing after an Edit-from-preflight.
+      inputRef.current.focus();
+      const range = document.createRange();
+      range.selectNodeContents(inputRef.current);
+      range.collapse(false);
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
     } else if (threadParentId && parentMessageText.length > 0) {
       // Thread just opened with an empty reply draft — seed suggestions from
       // the parent message so the user sees relevant agents already waiting.
@@ -205,7 +259,7 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       scheduleSuggestions(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey]);
+  }, [draftKey, rehydrateNonce]);
 
   // Persist draft as user types
   const persistDraft = () => {
@@ -269,8 +323,34 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
 
   const doSend = () => {
     if (!inputRef.current) return;
-    const text = inputRef.current.innerText.trim();
+    const text = serializeComposerToMrkdwn(inputRef.current).trim();
     if (!text) return;
+    const html = inputRef.current.innerHTML;
+
+    // Public-channel preflight: if Jordan is about to send a message that
+    // @-mentions an agent they haven't connected to their account yet, we
+    // intercept here and post a Slackbot-style ephemeral instead. The agent
+    // pane DM (`agentId`) skips this — that flow has its own setup screen.
+    if (!agentId) {
+      const mentionedAgentIds = readMentionedAgentIds(inputRef.current);
+      const unconnected = mentionedAgentIds.filter(
+        (id) => !agentSetupComplete[id],
+      );
+      if (unconnected.length > 0) {
+        postPreflightEphemeral({
+          text,
+          html,
+          unconnectedAgentIds: unconnected,
+          threadParentId,
+        });
+        inputRef.current.innerHTML = "";
+        setIsEmpty(true);
+        clearDraft(draftKey);
+        resetSuggestions();
+        return;
+      }
+    }
+
     if (agentId) {
       // If there's a proposal pending in this thread, treat the message as
       // an amendment to that proposal rather than a new question.
@@ -282,15 +362,26 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
         ]);
       }
     } else {
-      sendMessage(text, {
-        html: inputRef.current.innerHTML,
-        threadParentId,
-      });
+      sendMessage(text, { html, threadParentId });
     }
     inputRef.current.innerHTML = "";
     setIsEmpty(true);
     clearDraft(draftKey);
     resetSuggestions();
+  };
+
+  /** Read all `@agent` mention pills currently in the composer DOM. We rely
+   *  on the `data-user="_xxx"` attribute we stamp onto mention spans (agent
+   *  ids start with `_`). Used by the preflight check on Send. */
+  const readMentionedAgentIds = (root: HTMLElement): string[] => {
+    const ids: string[] = [];
+    root
+      .querySelectorAll<HTMLElement>('span.mention[data-user^="_"]')
+      .forEach((el) => {
+        const id = el.getAttribute("data-user");
+        if (id && !ids.includes(id)) ids.push(id);
+      });
+    return ids;
   };
 
   /**
@@ -346,6 +437,56 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     // Don't auto-dismiss the whole strip — the caller decides whether to
     // remove just this agent (chip apply) or close the strip entirely.
     clearSuggestionTimers();
+  };
+
+  /** Custom paste:
+   *  1. Force plain text — the native contentEditable paste drags in source
+   *     HTML (fonts, colors, link wrappers from Docs/Slack/etc.) which breaks
+   *     our mention plumbing.
+   *  2. Special-case "pasting a URL onto selected text" → wrap the selection
+   *     as a link, matching Slack's behavior. Without this, `insertText`
+   *     would just replace the selected text with the URL. */
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const text = e.clipboardData.getData("text/plain");
+    if (!text) return;
+    e.preventDefault();
+    const trimmed = text.trim();
+    const isUrl = /^https?:\/\/\S+$/i.test(trimmed);
+    const sel = window.getSelection();
+    const hasSelection =
+      !!sel && sel.rangeCount > 0 && sel.toString().length > 0;
+    if (isUrl && hasSelection) {
+      // execCommand("createLink") wraps the current selection in an
+      // <a href="url">. We stamp a class so the serializer on send can find
+      // these and convert them to Slack mrkdwn `<url|label>` syntax.
+      document.execCommand("createLink", false, trimmed);
+      // Tag the freshly-created anchor(s) so doSend can find them and so we
+      // can style them like links inside the input.
+      const root = inputRef.current;
+      if (root) {
+        root.querySelectorAll("a:not([data-composer-link])").forEach((a) => {
+          (a as HTMLAnchorElement).setAttribute("data-composer-link", "true");
+          (a as HTMLAnchorElement).setAttribute("target", "_blank");
+          (a as HTMLAnchorElement).setAttribute("rel", "noreferrer");
+        });
+        root.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      return;
+    }
+    if (typeof document.execCommand === "function") {
+      document.execCommand("insertText", false, text);
+      return;
+    }
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(document.createTextNode(text));
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (inputRef.current) {
+      inputRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -799,6 +940,7 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
           data-empty={isEmpty || undefined}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           onBlur={persistDraft}
         />
 

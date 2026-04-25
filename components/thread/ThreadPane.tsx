@@ -4,6 +4,8 @@ import { X } from "lucide-react";
 import { useMemo } from "react";
 import { useSlackStore } from "@/lib/store";
 import { MessageRow } from "@/components/channel/Message";
+import { PreflightEphemeral } from "@/components/channel/PreflightEphemeral";
+import { AgentConnectPrompt } from "@/components/channel/AgentConnectPrompt";
 import { Composer } from "@/components/composer/Composer";
 import { RightPaneResizer } from "@/components/shell/RightPaneResizer";
 
@@ -14,15 +16,30 @@ export function ThreadPane() {
   const conv = useSlackStore((s) => s.conversations[s.activeConversationId]);
   const width = useSlackStore((s) => s.rightPaneWidth);
 
+  const currentUserId = useSlackStore((s) => s.currentUserId);
   const parent = parentId ? messages[parentId] : null;
+  // Render every reply that's either public OR explicitly ephemeral-to-me.
+  // Ephemerals targeted at other users are filtered out (not relevant in
+  // this single-user prototype, but keeps the rendering invariant clean).
   const replies = useMemo(
     () =>
       parentId
         ? Object.values(messages)
-            .filter((m) => m.threadId === parentId)
+            .filter(
+              (m) =>
+                m.threadId === parentId &&
+                (!m.ephemeralFor || m.ephemeralFor === currentUserId),
+            )
             .sort((a, b) => a.createdAt - b.createdAt)
         : [],
-    [messages, parentId],
+    [messages, parentId, currentUserId],
+  );
+  // The "X replies" count refers to public replies only — ephemerals
+  // (preflights, in-thread connect prompts) shouldn't inflate it because
+  // the rest of the channel can't see them.
+  const publicReplyCount = useMemo(
+    () => replies.filter((r) => !r.ephemeralFor).length,
+    [replies],
   );
 
   if (!parentId || !parent) return null;
@@ -57,12 +74,18 @@ export function ThreadPane() {
       <div className="slack-scroll-light flex-1 overflow-y-auto">
         <MessageRow message={parent} compact={false} isThreadParent />
         <div className="mx-5 my-2 flex items-center gap-2 text-[12px] text-slack-text-muted">
-          <span>{replies.length} {replies.length === 1 ? "reply" : "replies"}</span>
+          <span>{publicReplyCount} {publicReplyCount === 1 ? "reply" : "replies"}</span>
           <div className="h-px flex-1 bg-slack-border" />
         </div>
-        {replies.map((r) => (
-          <MessageRow key={r.id} message={r} compact={false} />
-        ))}
+        {replies.map((r) => {
+          if (r.preflight) {
+            return <PreflightEphemeral key={r.id} message={r} />;
+          }
+          if (r.agentConnectPrompt) {
+            return <AgentConnectPrompt key={r.id} message={r} />;
+          }
+          return <MessageRow key={r.id} message={r} compact={false} />;
+        })}
       </div>
 
       <div>
