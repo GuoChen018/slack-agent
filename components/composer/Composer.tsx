@@ -499,24 +499,26 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       }
       return;
     }
-    // Already has an agent pill — assume the user has self-selected.
-    const hasMention = !!el.querySelector('span.mention[data-user^="_"]');
-    if (hasMention) {
-      hadMentionRef.current = true;
-      if (
-        suggestStateRef.current !== "dismissed" ||
-        suggestedRef.current.length > 0
-      ) {
-        setSuggestState("dismissed");
-        setSuggested([]);
-      }
-      return;
-    }
+    // Find every agent currently @mentioned in the draft. Used for two
+    // things: (a) immediately drop the matching chip from the strip if
+    // the user manually @-typed an agent that was being suggested — they
+    // already addressed it, no reason to keep pitching it. (b) feed the
+    // thread "added-then-deleted" persistence path below.
+    const mentionedAgentIds = new Set<string>();
+    el.querySelectorAll('span.mention[data-user^="_"]').forEach((node) => {
+      const id = node.getAttribute("data-user");
+      if (id) mentionedAgentIds.add(id);
+    });
+    if (mentionedAgentIds.size > 0) hadMentionRef.current = true;
     // The "added it then deleted it" case: an @mention was present at some
     // point and isn't anymore. That's an explicit dismissal — persist it
     // so reopening this thread (or wiping and retyping the draft) won't
     // resurrect the strip.
-    if (hadMentionRef.current && threadParentId) {
+    if (
+      hadMentionRef.current &&
+      mentionedAgentIds.size === 0 &&
+      threadParentId
+    ) {
       dismissThreadSuggestions(threadParentId);
       if (
         suggestStateRef.current !== "dismissed" ||
@@ -530,6 +532,21 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     // User explicitly X'd out (or had a pill that's now removed) — stay
     // dismissed until the draft resets.
     if (suggestStateRef.current === "dismissed") return;
+    // Drop any currently-shown chip whose agent the user just @-mentioned
+    // themselves. Done synchronously here so the chip disappears the same
+    // tick the mention lands, not after the suggestion debounce.
+    if (mentionedAgentIds.size > 0 && suggestedRef.current.length > 0) {
+      const filtered = suggestedRef.current.filter(
+        (a) => !mentionedAgentIds.has(a.id),
+      );
+      if (filtered.length !== suggestedRef.current.length) {
+        setSuggested(filtered);
+        if (filtered.length === 0) {
+          setSuggestState("dismissed");
+          return;
+        }
+      }
+    }
 
     const evaluate = () => {
       const draftEl = inputRef.current;
@@ -538,13 +555,20 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       const seedingFromParent =
         liveDraft.length === 0 && !!threadParentId && parentMessageText.length > 0;
       const liveSource = seedingFromParent ? parentMessageText : liveDraft;
+      // Re-read mentioned agents at evaluation time — the user may have
+      // typed/deleted between scheduling and firing.
+      const liveMentionedIds = new Set<string>();
+      draftEl.querySelectorAll('span.mention[data-user^="_"]').forEach((node) => {
+        const id = node.getAttribute("data-user");
+        if (id) liveMentionedIds.add(id);
+      });
       // When seeding from the thread parent we relax the trigger bar to 1.
       // Threads are an opt-in surface (the user opened it intentionally) and
       // the heuristic is less likely to land 2 hits on a passive context
       // sentence than on a freshly-typed action sentence.
       const candidates = suggestAgentsForDraft(liveSource, {
         minScore: seedingFromParent ? 1 : 2,
-      });
+      }).filter((a) => !liveMentionedIds.has(a.id));
       const prev = suggestedRef.current;
       const nextKey = candidates.map((a) => a.id).sort().join(",");
       const prevKey = prev.map((a) => a.id).sort().join(",");
