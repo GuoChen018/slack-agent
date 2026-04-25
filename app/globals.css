@@ -4,13 +4,19 @@
   --font-sans: var(--font-lato), "Slack-Lato", "Lato", "Helvetica Neue",
     Helvetica, "Segoe UI", Tahoma, Arial, sans-serif;
 
-  /* Slack aubergine sidebar palette */
-  --color-slack-aubergine: #19171d;
-  --color-slack-aubergine-hover: #27242c;
-  --color-slack-aubergine-active: #1164a3;
-  --color-slack-aubergine-border: #2c2d30;
-  --color-slack-rail: #3f0e40;
-  --color-slack-rail-hover: #350d36;
+  /* Modern Slack aubergine/lavender palette (2024+) */
+  --color-slack-rail: #4e1151;          /* top bar + workspace rail */
+  --color-slack-rail-active: #835586;   /* active nav chip */
+  --color-slack-rail-dot: #3e103f;      /* dot inside active nav icon */
+  --color-slack-sidebar: #68326a;       /* sidebar background */
+  --color-slack-sidebar-hover: #4d2a51; /* sidebar row hover */
+  --color-slack-search-bg: #784b7a;     /* top search input */
+
+  /* Retained aliases so existing references keep working */
+  --color-slack-aubergine: #68326a;
+  --color-slack-aubergine-hover: #4d2a51;
+  --color-slack-aubergine-active: #ffffff;
+  --color-slack-aubergine-border: #4d2a51;
 
   /* Main pane */
   --color-slack-pane: #ffffff;
@@ -61,6 +67,26 @@ body {
   line-height: 1.46668;
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Mention / channel pill — used in rendered messages AND in the composer */
+.mention,
+.channel-ref {
+  background: rgba(29, 155, 209, 0.1);
+  color: #1264a3;
+  padding: 0 3px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 400;
+}
+.mention:hover,
+.channel-ref:hover {
+  background: rgba(29, 155, 209, 0.1);
+  color: #1264a3;
+}
+
 /* Custom scrollbars that match Slack's look */
 .slack-scroll {
   scrollbar-width: thin;
@@ -102,14 +128,18 @@ body {
 }
 
 /* Composer contenteditable */
-.composer-input[contenteditable="true"]:empty::before {
+.composer-input {
+  outline: none;
+  position: relative;
+}
+
+.composer-input[contenteditable="true"][data-empty]::before {
   content: attr(data-placeholder);
   color: #868686;
   pointer-events: none;
-}
-
-.composer-input {
-  outline: none;
+  position: absolute;
+  top: 8px; /* match py-2 */
+  left: 12px; /* match px-3 */
 }
 
 .composer-input code {
@@ -152,15 +182,6 @@ body {
   list-style-type: decimal;
 }
 
-.composer-input .mention,
-.composer-input .channel-ref {
-  background: rgba(29, 155, 209, 0.1);
-  color: #1264a3;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-weight: 700;
-}
-
 .composer-input a {
   color: #1264a3;
   text-decoration: underline;
@@ -179,4 +200,106 @@ body {
 }
 .message-row:hover {
   background: #f8f8f8;
+}
+
+/* Shimmer text — used for the suggestion loader and for an agent's
+   "thinking" state. Sweeps a light highlight across the text by masking
+   a moving gradient onto it. */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #868686 0%,
+    #868686 35%,
+    #1d1c1d 50%,
+    #868686 65%,
+    #868686 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 1.6s linear infinite;
+}
+
+/* One-shot shimmer used for the "this just appeared from the AI" beat on
+   suggested-agent chips. The class is applied for ~1.2s by the chip's local
+   state and then dropped, so the underlying text reverts to normal color. */
+.shimmer-text-once {
+  background: linear-gradient(
+    90deg,
+    #868686 0%,
+    #868686 35%,
+    #1d1c1d 50%,
+    #868686 65%,
+    #868686 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 1.2s linear 1;
+}
+
+/* Hover-card / popover entrance — subtle fade + lift. Used by the @mention
+   hover card and the suggestion hover card so they don't snap in. */
+@keyframes hover-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-hover-card-in {
+  animation: hover-card-in 140ms ease-out both;
+}
+
+/* Suggestion strip entrance — gentle blur clearing into focus while the
+   strip lifts a few pixels. The hover card is portaled to body, so the
+   filter/transform on this wrapper no longer affects fixed positioning. */
+@keyframes suggestion-strip-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+.animate-suggestion-strip-in {
+  animation: suggestion-strip-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+/* On dark surfaces (agent pane bubble) we sweep a brighter band. */
+.shimmer-text-dark {
+  background: linear-gradient(
+    90deg,
+    #9a9b9e 0%,
+    #9a9b9e 35%,
+    #ffffff 50%,
+    #9a9b9e 65%,
+    #9a9b9e 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-sweep 1.6s linear infinite;
 }

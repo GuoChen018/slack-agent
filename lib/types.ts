@@ -10,8 +10,9 @@ export interface User {
   displayName: string;
   handle: string;
   title?: string;
-  avatarColor: string; // gradient seed color
+  avatarColor: string; // solid color fallback
   avatarEmoji?: string;
+  avatarUrl?: string; // portrait image
   presence: Presence;
   status?: { emoji: string; text: string };
   isBot?: boolean;
@@ -62,6 +63,10 @@ export interface Message {
   lastReplyAt?: number;
   attachments?: FileAttachment[];
   isSystem?: boolean;
+  /** Set on agent-authored messages while a scripted reply is mid-flight.
+   * Drives the per-agent status indicator in the thread UI. `queued` means
+   * the agent is waiting for a previous agent to finish before it starts. */
+  agentStatus?: "queued" | "thinking" | "streaming" | "done";
 }
 
 export interface DraftState {

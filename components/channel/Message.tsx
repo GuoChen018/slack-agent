@@ -3,6 +3,9 @@
 import clsx from "clsx";
 import {
   Bookmark,
+  Check,
+  Clock,
+  Loader2,
   MessageSquare,
   MoreVertical,
   Share,
@@ -19,16 +22,37 @@ interface Props {
   message: Msg;
   compact: boolean; // true means grouped under previous sender
   onOpenThread?: (id: string) => void;
+  isThreadParent?: boolean; // rendered as the parent inside ThreadPane
 }
 
 const QUICK_REACTIONS = ["👍", "🙌", "🎉", "👀", "❤️", "🔥"];
 
-export function MessageRow({ message, compact, onOpenThread }: Props) {
+export function MessageRow({
+  message,
+  compact,
+  onOpenThread,
+  isThreadParent,
+}: Props) {
   const users = useSlackStore((s) => s.users);
   const convs = useSlackStore((s) => s.conversations);
   const currentUserId = useSlackStore((s) => s.currentUserId);
   const toggleReaction = useSlackStore((s) => s.toggleReaction);
   const author = users[message.authorId];
+  const allMessages = useSlackStore((s) => s.messages);
+
+  // For agent-authored thread replies on this parent, surface their live
+  // status (queued/thinking/streaming/done) inline on the channel-level
+  // thread footer so Jordan can see who's doing what without opening the
+  // thread.
+  const agentReplies = useMemo(() => {
+    if (!message.replyCount) return [];
+    return Object.values(allMessages)
+      .filter((m) => m.threadId === message.id && m.agentStatus)
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }, [allMessages, message.id, message.replyCount]);
+  const hasInFlightAgent = agentReplies.some(
+    (m) => m.agentStatus !== "done",
+  );
 
   const convsByName = useMemo(() => {
     const out: Record<string, { id: string; name: string }> = {};
@@ -48,7 +72,8 @@ export function MessageRow({ message, compact, onOpenThread }: Props) {
   return (
     <div
       className={clsx(
-        "message-row group relative flex gap-2 px-5 py-[2px]",
+        "group relative flex gap-2 px-5 py-[2px]",
+        !isThreadParent && "message-row",
         compact ? "" : "mt-2",
       )}
     >
@@ -68,21 +93,36 @@ export function MessageRow({ message, compact, onOpenThread }: Props) {
             <span className="text-[15px] font-black text-slack-text">
               {author.displayName}
             </span>
-            {author.isBot && (
-              <span className="rounded bg-[#F4EDE4] px-1 text-[10px] font-bold uppercase tracking-wide text-[#1D1C1D]">
-                {author.isAgent ? "Agent" : "App"}
-              </span>
-            )}
+            {(author.isBot || author.isAgent) &&
+              (author.isAgent ? (
+                <span className="rounded bg-slack-pane-alt px-1.5 py-[1px] text-[10px] font-bold uppercase tracking-wide text-slack-text-muted">
+                  Agent
+                </span>
+              ) : (
+                <span className="rounded bg-[#F4EDE4] px-1 text-[10px] font-bold uppercase tracking-wide text-[#1D1C1D]">
+                  App
+                </span>
+              ))}
             <span className="text-[12px] text-slack-text-light">
               {formatTime(message.createdAt)}
             </span>
+            <AgentStatusPill status={message.agentStatus} />
           </div>
         )}
 
-        <div
-          className="text-[15px] text-slack-text"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        {message.agentStatus === "queued" ? null : message.agentStatus === "thinking" ? (
+          <div className="text-[15px]">
+            <span className="shimmer-text">Thinking…</span>
+          </div>
+        ) : (
+          <div
+            className={clsx(
+              "text-[15px] text-slack-text",
+              message.agentStatus === "streaming" && "agent-msg agent-msg-streaming",
+            )}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        )}
 
         {message.editedAt && (
           <span className="text-[11px] text-slack-text-light"> (edited)</span>
@@ -128,31 +168,53 @@ export function MessageRow({ message, compact, onOpenThread }: Props) {
           </div>
         )}
 
-        {/* Thread preview */}
-        {!!message.replyCount && (
+        {/* Layer 1 — agent status pills. While each @-mentioned agent is
+            queued/thinking/streaming, surface a Slack-reaction-shaped pill
+            containing just the emoji. Hover reveals a tooltip with the
+            agent's name + status, mirroring Slack's reaction tooltips. */}
+        {hasInFlightAgent && !isThreadParent && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {agentReplies
+              .filter((m) => m.agentStatus !== "done")
+              .map((reply) => {
+                const replyAuthor = users[reply.authorId];
+                if (!replyAuthor) return null;
+                return (
+                  <AgentStatusEmojiPill
+                    key={reply.id}
+                    name={replyAuthor.displayName}
+                    status={reply.agentStatus}
+                  />
+                );
+              })}
+          </div>
+        )}
+
+        {/* Layer 2 — standard thread preview. Only renders once at least one
+            agent has actually responded (or there are non-agent replies),
+            so the count and "Last reply" timestamp are always truthful. */}
+        {!!message.replyCount && !isThreadParent && (
           <button
             onClick={() => onOpenThread?.(message.id)}
-            className="mt-1 flex items-center gap-2 rounded-md border border-transparent px-1 py-1 text-[13px] hover:border-slack-border hover:bg-white"
+            className="mt-1 flex w-full items-center gap-2 rounded-md border border-transparent px-1 py-1 text-[13px] hover:border-slack-border hover:bg-white"
           >
-            <div className="flex -space-x-1">
+            <div className="flex gap-1">
               {(message.replyUserIds ?? []).map((id) => (
-                <Avatar key={id} user={users[id]} size={20} rounded="md" />
+                <Avatar key={id} user={users[id]} size={24} rounded="md" />
               ))}
             </div>
             <span className="font-bold text-[#1264a3]">
               {message.replyCount} {message.replyCount === 1 ? "reply" : "replies"}
             </span>
-            <span className="text-slack-text-light">
+            <span className="text-slack-text-light whitespace-nowrap">
               Last reply {message.lastReplyAt ? formatRelativeShort(message.lastReplyAt) : ""}
-            </span>
-            <span className="ml-auto hidden text-slack-text-light group-hover:inline">
-              View thread →
             </span>
           </button>
         )}
       </div>
 
-      {/* Hover action bar */}
+      {/* Hover action bar — not shown on the thread parent */}
+      {!isThreadParent && (
       <div className="message-actions pointer-events-none absolute -top-3 right-5 flex h-8 items-center rounded-md border border-slack-border bg-white shadow-sm">
         {QUICK_REACTIONS.slice(0, 3).map((e) => (
           <button
@@ -195,6 +257,72 @@ export function MessageRow({ message, compact, onOpenThread }: Props) {
           <MoreVertical size={16} />
         </button>
       </div>
+      )}
     </div>
   );
 }
+
+/** Channel-level status pill: just an emoji in a reaction-style chip with a
+ * hover tooltip that reads "Agentforce is thinking", etc. Mirrors the way
+ * Slack reveals reaction shortcodes on hover. */
+function AgentStatusEmojiPill({
+  name,
+  status,
+}: {
+  name: string;
+  status: Msg["agentStatus"];
+}) {
+  const emoji = status === "queued" ? "⏳" : "👀";
+  const verb =
+    status === "queued"
+      ? "is waiting in queue"
+      : status === "thinking"
+        ? "is thinking"
+        : "is replying";
+  return (
+    <span className="group relative inline-flex">
+      <span className="flex h-6 items-center rounded-full border border-slack-border bg-[#f8f8f8] px-2 text-[14px] leading-none">
+        {emoji}
+      </span>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#1A1D21] px-2 py-1 text-[12px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100"
+      >
+        <span className="font-bold">{name}</span> {verb}
+      </span>
+    </span>
+  );
+}
+
+/** Tiny per-agent status indicator that lives next to the timestamp on
+ * agent-authored thread replies. Shows a clock for queued agents, a spinner
+ * while thinking/streaming, and a check once the reply is in. */
+function AgentStatusPill({ status }: { status?: Msg["agentStatus"] }) {
+  if (!status) return null;
+  if (status === "queued") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[#f4ede4] px-1.5 py-[1px] text-[11px] font-medium text-slack-text-muted">
+        <Clock size={11} />
+        Waiting
+      </span>
+    );
+  }
+  if (status === "thinking" || status === "streaming") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf3ff] px-1.5 py-[1px] text-[11px] font-medium text-[#1264a3]">
+        <Loader2 size={11} className="animate-spin" />
+        {status === "thinking" ? "Thinking" : "Working"}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-[#e6f4ec] px-1.5 py-[1px] text-[11px] font-medium text-[#0b7a3e]"
+      title="Done"
+    >
+      <Check size={11} />
+      Done
+    </span>
+  );
+}
+

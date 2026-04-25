@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${lato.variable} h-full antialiased`}>
-      <body className="h-full overflow-hidden bg-slack-aubergine text-slack-text">
+      <body className="h-full overflow-hidden bg-slack-rail text-slack-text">
         {children}
       </body>
     </html>

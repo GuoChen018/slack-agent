@@ -1,28 +1,22 @@
 "use client";
 
 import {
-  Upload,
-  ClipboardPaste,
   FileText,
-  ListTodo,
-  PenTool,
-  Calendar,
+  Type as TypeIcon,
+  Play,
+  Laptop2,
   Video,
-  Megaphone,
-  Workflow,
+  Mic,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 const items = [
-  { icon: Upload, label: "Upload from your computer", desc: "" },
-  { icon: ClipboardPaste, label: "From Google Drive", desc: "" },
-  { icon: FileText, label: "Create a canvas", desc: "A rich document in-line" },
-  { icon: ListTodo, label: "Create a list", desc: "Track work in Slack" },
-  { icon: PenTool, label: "Create a post", desc: "A longform post in a channel" },
-  { icon: Calendar, label: "Create an event", desc: "" },
-  { icon: Video, label: "Record a clip", desc: "Video or audio clip" },
-  { icon: Megaphone, label: "Create an announcement", desc: "" },
-  { icon: Workflow, label: "Add a workflow", desc: "" },
+  { icon: Laptop2, label: "Upload from your computer" },
+  { icon: Video, label: "Record video clip" },
+  { icon: Mic, label: "Record audio clip" },
+  { icon: FileText, label: "Canvas" },
+  { icon: Play, label: "Workflow" },
+  { icon: TypeIcon, label: "Text snippet" },
 ];
 
 export function PlusMenu({ onClose }: { onClose: () => void }) {
@@ -39,19 +33,16 @@ export function PlusMenu({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={ref}
-      className="absolute bottom-[120%] left-0 z-50 w-[340px] overflow-hidden rounded-lg border border-slack-border bg-white shadow-xl"
+      className="absolute bottom-[120%] left-0 z-50 w-[260px] overflow-hidden rounded-lg border border-slack-border bg-white shadow-md"
     >
       <ul className="py-1">
-        {items.map(({ icon: Icon, label, desc }) => (
+        {items.map(({ icon: Icon, label }) => (
           <li
             key={label}
-            className="flex cursor-pointer items-center gap-3 px-3 py-1.5 hover:bg-[#1264a3] hover:text-white"
+            className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-[14px] hover:bg-[#f4f4f4]"
           >
-            <Icon size={16} />
-            <div className="flex-1">
-              <div className="text-[14px] font-semibold">{label}</div>
-              {desc && <div className="text-[12px] opacity-70">{desc}</div>}
-            </div>
+            <Icon size={16} strokeWidth={1.75} className="text-slack-text" />
+            <span className="text-slack-text">{label}</span>
           </li>
         ))}
       </ul>

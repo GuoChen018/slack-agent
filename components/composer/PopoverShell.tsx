@@ -36,8 +36,9 @@ export function PopoverShell({
     };
   }, [onClose]);
 
-  // Anchor to caret: popover sits above caret
-  const top = Math.max(10, rect.top - maxHeight - 8);
+  // Anchor the popover's BOTTOM edge 8px above the caret so it hugs the input
+  // regardless of how many rows are rendered.
+  const bottom = Math.max(10, window.innerHeight - rect.top + 8);
   const left = Math.min(
     window.innerWidth - width - 12,
     Math.max(12, rect.left - 12),
@@ -48,7 +49,7 @@ export function PopoverShell({
       ref={ref}
       role="listbox"
       className="fixed z-50 overflow-hidden rounded-lg border border-slack-border bg-white shadow-xl"
-      style={{ top, left, width, maxHeight }}
+      style={{ bottom, left, width, maxHeight }}
     >
       {children}
     </div>

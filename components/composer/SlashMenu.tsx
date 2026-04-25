@@ -57,6 +57,7 @@ export function SlashMenu({ query, rect, onPick, onClose }: Props) {
       } else if (e.key === "Enter" || e.key === "Tab") {
         if (list[idx]) {
           e.preventDefault();
+          e.stopPropagation();
           onPick(list[idx].cmd);
         }
       }
@@ -77,6 +78,7 @@ export function SlashMenu({ query, rect, onPick, onClose }: Props) {
           <li
             key={c.cmd}
             onMouseEnter={() => setIdx(i)}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPick(c.cmd)}
             className={
               "flex cursor-pointer flex-col px-3 py-1.5 " +

@@ -26,25 +26,28 @@ export function renderMrkdwn(
     )
     .join("\n");
 
+  // Normalize GitHub-style **bold** down to Slack's *bold* before the bold
+  // pass so scripts can use either flavor.
+  safe = safe.replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
   // Bold *...*
-  safe = safe.replace(/(^|\s)\*([^*\n]+)\*(?=\s|[.,!?)]|$)/g, "$1<strong>$2</strong>");
+  safe = safe.replace(/(^|\s)\*([^*\n]+)\*(?=\s|[.,!?:;)]|$)/g, "$1<strong>$2</strong>");
   // Italic _..._
-  safe = safe.replace(/(^|\s)_([^_\n]+)_(?=\s|[.,!?)]|$)/g, "$1<em>$2</em>");
+  safe = safe.replace(/(^|\s)_([^_\n]+)_(?=\s|[.,!?:;)]|$)/g, "$1<em>$2</em>");
   // Strike ~...~
-  safe = safe.replace(/(^|\s)~([^~\n]+)~(?=\s|[.,!?)]|$)/g, "$1<span style='text-decoration:line-through'>$2</span>");
+  safe = safe.replace(/(^|\s)~([^~\n]+)~(?=\s|[.,!?:;)]|$)/g, "$1<span style='text-decoration:line-through'>$2</span>");
 
   // @mentions by handle
   safe = safe.replace(/@([a-z0-9_\-]+)/gi, (m, h) => {
     const u = Object.values(users).find((x) => x.handle === h.toLowerCase());
     if (!u) return m;
-    return `<span class="mention">@${u.displayName}</span>`;
+    return `<span class="mention" data-user="${u.id}">@${u.displayName}</span>`;
   });
 
   // #channel by name
   safe = safe.replace(/#([a-z0-9_\-]+)/gi, (m, n) => {
     const c = conversationsByName[n.toLowerCase()];
     if (!c) return m;
-    return `<span class="channel-ref">#${c.name}</span>`;
+    return `<span class="channel-ref" data-channel="${c.id}">#${c.name}</span>`;
   });
 
   // :emoji: shortcodes

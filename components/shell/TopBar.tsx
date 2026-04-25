@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Clock, Search, HelpCircle } from "lucide-react";
+import { Clock, Search, HelpCircle } from "lucide-react";
 import { useSlackStore } from "@/lib/store";
 
 export function TopBar() {
@@ -9,35 +9,36 @@ export function TopBar() {
     (s) => s.conversations[s.activeConversationId],
   );
   return (
-    <div className="flex h-[44px] items-center gap-2 bg-[#3F0E40] px-4 text-white">
-      <div className="flex items-center gap-1">
-        <button className="rounded p-1 text-white/70 hover:bg-white/10 disabled:opacity-40" disabled>
-          <ChevronLeft size={18} />
-        </button>
-        <button className="rounded p-1 text-white/70 hover:bg-white/10 disabled:opacity-40" disabled>
-          <ChevronRight size={18} />
-        </button>
-        <button className="ml-1 rounded p-1 text-white/70 hover:bg-white/10" title="History">
-          <Clock size={16} />
-        </button>
-      </div>
+    <div className="flex h-[44px] shrink-0 items-center gap-2 bg-slack-rail px-3 text-white">
+      {/* Left spacer so the search stays centered */}
+      <div className="flex-1" />
 
+      {/* History + search cluster sit together, centered */}
+      <button
+        className="flex h-7 w-7 items-center justify-center rounded-md text-white/85 hover:bg-white/10"
+        title="History"
+      >
+        <Clock size={16} />
+      </button>
       <button
         onClick={() => setQuickSwitcher(true)}
-        className="mx-auto flex h-7 w-full max-w-[720px] items-center gap-2 rounded-md bg-white/10 px-3 text-left text-[13px] text-white/85 ring-1 ring-white/15 hover:bg-white/15"
+        className="flex h-[26px] w-full max-w-[800px] items-center gap-2 rounded-md bg-[#784b7a] px-3 text-left text-[13px] text-white shadow-[0_0_0_1px_rgba(29,28,29,0.3),0_1px_3px_rgba(0,0,0,0.08)] hover:bg-[#865a89]"
       >
-        <Search size={14} />
-        <span className="truncate">
-          Search{conv ? ` ${conv.kind === "channel" ? `#${conv.name}` : conv.name}` : ""}
+        <Search size={14} className="text-white/85" />
+        <span className="truncate text-white/90">
+          Search{conv ? ` ${conv.kind === "channel" ? conv.name : conv.name}` : ""}
         </span>
-        <kbd className="ml-auto hidden items-center gap-1 rounded bg-black/20 px-1.5 py-0.5 text-[10px] font-medium text-white/80 md:flex">
-          ⌘ K
-        </kbd>
       </button>
 
-      <button className="rounded p-1 text-white/70 hover:bg-white/10" title="Help">
-        <HelpCircle size={16} />
-      </button>
+      {/* Right cluster */}
+      <div className="flex flex-1 justify-end">
+        <button
+          className="flex h-7 w-7 items-center justify-center rounded-full text-white/85 hover:bg-white/10"
+          title="Help"
+        >
+          <HelpCircle size={16} />
+        </button>
+      </div>
     </div>
   );
 }

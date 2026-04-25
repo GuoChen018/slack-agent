@@ -44,6 +44,7 @@ export function ChannelPicker({ query, rect, onPick, onClose }: Props) {
       } else if (e.key === "Enter" || e.key === "Tab") {
         if (list[idx]) {
           e.preventDefault();
+          e.stopPropagation();
           onPick(list[idx]);
         }
       }
@@ -56,27 +57,20 @@ export function ChannelPicker({ query, rect, onPick, onClose }: Props) {
 
   return (
     <PopoverShell rect={rect} onClose={onClose} width={360}>
-      <div className="border-b border-slack-border px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-slack-text-muted">
-        Channels matching {query ? <code>{query}</code> : "anyone"}
-      </div>
       <ul className="max-h-[280px] overflow-y-auto py-1">
         {list.map((c, i) => (
           <li
             key={c.id}
             onMouseEnter={() => setIdx(i)}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPick(c)}
             className={
               "flex cursor-pointer items-center gap-2 px-3 py-1.5 " +
               (i === idx ? "bg-[#1264a3] text-white" : "text-slack-text")
             }
           >
-            {c.isPrivate ? <Lock size={14} /> : <Hash size={14} />}
-            <span className="font-bold">{c.name}</span>
-            {c.topic && (
-              <span className={i === idx ? "text-white/80 text-[13px] truncate" : "text-slack-text-muted text-[13px] truncate"}>
-                {c.topic}
-              </span>
-            )}
+            {c.isPrivate ? <Lock size={14} className="shrink-0" /> : <Hash size={14} className="shrink-0" />}
+            <span className="truncate font-bold">{c.name}</span>
           </li>
         ))}
       </ul>

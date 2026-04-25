@@ -89,6 +89,7 @@ export function EmojiPicker({ rect, query = "", inline, onPick, onClose }: Props
         {items.map((x) => (
           <button
             key={x.e + x.k.join()}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPick(x.e)}
             className="flex h-8 w-8 items-center justify-center rounded hover:bg-slack-pane-hover"
             title={`:${x.k[0]}:`}

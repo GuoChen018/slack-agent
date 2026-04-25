@@ -7,25 +7,32 @@ import { ChannelHeader } from "@/components/channel/ChannelHeader";
 import { MessageList } from "@/components/channel/MessageList";
 import { Composer } from "@/components/composer/Composer";
 import { ThreadPane } from "@/components/thread/ThreadPane";
+import { AgentPane } from "@/components/agent/AgentPane";
 import { QuickSwitcher } from "@/components/QuickSwitcher";
+import { MentionHoverCard } from "@/components/MentionHoverCard";
 import { useSlackStore } from "@/lib/store";
 
 export default function SlackApp() {
   const threadOpen = useSlackStore((s) => !!s.openThreadParentId);
+  const agentOpen = useSlackStore((s) => !!s.openAgentId);
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#3F0E40]">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slack-rail">
       <TopBar />
       <div className="flex min-h-0 flex-1">
         <WorkspaceRail />
-        <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col bg-white">
-          <ChannelHeader />
-          <MessageList />
-          <Composer />
-        </main>
-        {threadOpen && <ThreadPane />}
+        <div className="flex min-h-0 flex-1 pr-1.5 pb-1.5">
+          <Sidebar />
+          <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-r-lg bg-white">
+            <ChannelHeader />
+            <MessageList />
+            <Composer />
+          </main>
+          {threadOpen && <ThreadPane />}
+          {agentOpen && <AgentPane />}
+        </div>
       </div>
       <QuickSwitcher />
+      <MentionHoverCard />
     </div>
   );
 }
