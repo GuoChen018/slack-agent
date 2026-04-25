@@ -182,9 +182,15 @@ button:not(:disabled) {
   list-style-type: decimal;
 }
 
-.composer-input a {
+.composer-input a,
+.message-body a {
   color: #1264a3;
   text-decoration: underline;
+}
+.composer-input a:hover,
+.message-body a:hover {
+  text-decoration: underline;
+  color: #0b4c81;
 }
 
 /* Hover action reveal */

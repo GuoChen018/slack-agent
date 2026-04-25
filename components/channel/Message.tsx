@@ -142,7 +142,7 @@ export function MessageRow({
         ) : (
           <div
             className={clsx(
-              "text-[15px] text-slack-text",
+              "message-body text-[15px] text-slack-text",
               message.agentStatus === "streaming" && "agent-msg agent-msg-streaming",
             )}
             dangerouslySetInnerHTML={{ __html: html }}
