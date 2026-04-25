@@ -121,6 +121,7 @@ Three moments.
 | 2      | Agent pane composer (after proposal) | `actually push close to Aug 1`                                                                                                   |
 | 3      | Channel composer                     | `Updated Salesforce after the call - @Agentforce can you post a quick recap and @Gong can you back it up with the call moments?` |
 
+
 ---
 
 ## Alt drafts — exercising the multi-agent suggestion strip

@@ -13,6 +13,11 @@ import type {
 } from "./types";
 import { conversations, initialMessages, users } from "./mockData";
 import { AGENTS, AGENTS_BY_ID, type AgentId } from "./agents";
+import {
+  DEFAULT_VARIANTS,
+  saveVariantsToStorage,
+  type VariantState,
+} from "./variants";
 
 export type { AgentId };
 export type AgentMessageId = string;
@@ -66,6 +71,19 @@ interface SlackState {
   unread: Record<ConversationId, number>;
   collapsedSections: Record<string, boolean>;
   quickSwitcherOpen: boolean;
+
+  /** Prototype variant flags. Each axis represents a design decision we want
+   * to be able to A/B in the running app via the variant palette
+   * (Cmd+Shift+K). New axes are added here; the palette enumerates them and
+   * options come from VARIANT_OPTIONS in lib/variants.ts. Persisted to
+   * localStorage so a refresh keeps the chosen variant. */
+  variants: VariantState;
+  setVariant: <K extends keyof VariantState>(
+    key: K,
+    value: VariantState[K],
+  ) => void;
+  variantPaletteOpen: boolean;
+  setVariantPaletteOpen: (open: boolean) => void;
 
   sidebarWidth: number;
   setSidebarWidth: (w: number) => void;
@@ -179,6 +197,20 @@ export const useSlackStore = create<SlackState>((set, get) => ({
   },
   collapsedSections: {},
   quickSwitcherOpen: false,
+
+  // Variants are hydrated from localStorage on first read in the browser via
+  // the layout-level `<VariantsHydrator />`. SSR sees defaults; the hydrator
+  // overwrites them on mount before paint. This keeps the initial render
+  // deterministic and avoids hydration warnings.
+  variants: DEFAULT_VARIANTS,
+  setVariant: (key, value) =>
+    set((s) => {
+      const next = { ...s.variants, [key]: value } as VariantState;
+      saveVariantsToStorage(next);
+      return { variants: next };
+    }),
+  variantPaletteOpen: false,
+  setVariantPaletteOpen: (open) => set({ variantPaletteOpen: open }),
 
   sidebarWidth: 291,
   setSidebarWidth: (w) =>

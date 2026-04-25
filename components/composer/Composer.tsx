@@ -85,6 +85,9 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
   const inputRef = useRef<HTMLDivElement>(null);
 
   const openAgent = useSlackStore((s) => s.openAgent);
+  const suggestionPlacement = useSlackStore(
+    (s) => s.variants.suggestionPlacement,
+  );
 
   // Suggestion state machine. Disabled inside thread composers — agentic
   // suggestions only show in the main channel composer.
@@ -529,6 +532,33 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     el.focus();
   };
 
+  // The suggestion strip is the same component in both placements; only its
+  // wrapper and `placement` prop change. We render it in either the footer
+  // (inline) or above the input (above-input), based on the active variant.
+  const suggestionStripEnabled = !threadParentId && !agentId;
+  const renderSuggestionStrip = (placement: "inline" | "above-input") => (
+    <SuggestionStrip
+      state={suggestState}
+      agents={suggested}
+      shimmer={shimmerOnReveal}
+      placement={placement}
+      onApply={(a) => {
+        insertMentionAtEnd(a);
+        setSuggested((prev) => prev.filter((x) => x.id !== a.id));
+      }}
+      onDismiss={(a) => {
+        setSuggested((prev) => {
+          const next = prev.filter((x) => x.id !== a.id);
+          if (next.length === 0) setSuggestState("dismissed");
+          return next;
+        });
+      }}
+      onMessageAgent={(a) => {
+        openAgent(a.id);
+      }}
+    />
+  );
+
   return (
     <div className="p-5">
       <div
@@ -540,6 +570,15 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
         {showToolbar && (
           <FormattingToolbar exec={execCmd} onToggle={() => setShowToolbar(false)} />
         )}
+
+        {suggestionStripEnabled &&
+          suggestionPlacement === "above-input" &&
+          suggestState === "ready" &&
+          suggested.length > 0 && (
+            <div className="border-b border-slack-border bg-slack-pane-alt/40">
+              {renderSuggestionStrip("above-input")}
+            </div>
+          )}
 
         <div
           ref={inputRef}
@@ -614,30 +653,9 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
             </button>
           </div>
 
-          {!threadParentId && !agentId && (
+          {suggestionStripEnabled && suggestionPlacement === "inline" && (
             <div className="ml-2 flex min-w-0 flex-1 items-center">
-              <SuggestionStrip
-                state={suggestState}
-                agents={suggested}
-                shimmer={shimmerOnReveal}
-                onApply={(a) => {
-                  insertMentionAtEnd(a);
-                  // The new @agent pill triggers the dismissed branch on the
-                  // next scheduleSuggestions pass, so just remove the chip
-                  // from the strip here.
-                  setSuggested((prev) => prev.filter((x) => x.id !== a.id));
-                }}
-                onDismiss={(a) => {
-                  setSuggested((prev) => {
-                    const next = prev.filter((x) => x.id !== a.id);
-                    if (next.length === 0) setSuggestState("dismissed");
-                    return next;
-                  });
-                }}
-                onMessageAgent={(a) => {
-                  openAgent(a.id);
-                }}
-              />
+              {renderSuggestionStrip("inline")}
             </div>
           )}
 

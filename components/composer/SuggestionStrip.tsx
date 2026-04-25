@@ -9,6 +9,15 @@ import { SuggestionHoverCard } from "./SuggestionHoverCard";
 
 export type SuggestionState = "idle" | "ready" | "dismissed";
 
+/** Where the strip is being rendered.
+ *
+ * - `inline`: shares the composer footer with the formatting toolbar; is
+ *   constrained horizontally and gets a content-aware compact mode that
+ *   drops agent names to icons when space runs out.
+ * - `above-input`: a full-width row above the input field, akin to file
+ *   upload chips or link previews. Always shows full agent names. */
+export type SuggestionPlacement = "inline" | "above-input";
+
 interface Props {
   state: SuggestionState;
   agents: AgentMeta[];
@@ -16,6 +25,7 @@ interface Props {
    * mount. The composer flips this back to false ~1.3s after a fresh reveal
    * so subsequent re-renders don't try to re-trigger. */
   shimmer: boolean;
+  placement?: SuggestionPlacement;
   onApply: (agent: AgentMeta) => void;
   onDismiss: (agent: AgentMeta) => void;
   onMessageAgent: (agent: AgentMeta) => void;
@@ -27,6 +37,7 @@ export function SuggestionStrip({
   state,
   agents,
   shimmer,
+  placement = "inline",
   onApply,
   onDismiss,
   onMessageAgent,
@@ -50,11 +61,15 @@ export function SuggestionStrip({
 
   // When the available width gets cramped (sidebar widened, channel narrowed,
   // multiple chips), drop the agent name from each chip and just show the
-  // logo. Threshold is content-aware: estimate the width needed to render
-  // every chip with its name and compare to what we actually have.
+  // logo. Only relevant for the inline placement — the above-input row spans
+  // the full composer width and never needs to compress.
   const stripRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
   useEffect(() => {
+    if (placement !== "inline") {
+      setCompact(false);
+      return;
+    }
     const el = stripRef.current;
     if (!el) return;
     const SUGGESTED_LABEL_AND_GAPS = 100; // sparkle + "Suggested" + gaps
@@ -65,7 +80,7 @@ export function SuggestionStrip({
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [agents.length]);
+  }, [agents.length, placement]);
 
   const cancelHide = () => {
     if (hideTimer.current) {
@@ -83,12 +98,17 @@ export function SuggestionStrip({
   if (!agents.length) return null;
 
   // `w-full` so the strip claims the full width its parent allots — the
-  // ResizeObserver below relies on this to read the *available* width
-  // rather than the strip's collapsed content width.
+  // ResizeObserver above relies on this to read the *available* width
+  // rather than the strip's collapsed content width. The above-input
+  // variant adds a little extra horizontal padding so the row reads as a
+  // contained band attached to the top of the input field.
   return (
     <div
       ref={stripRef}
-      className="animate-suggestion-strip-in flex w-full min-w-0 items-center gap-1 pl-1 pr-2"
+      className={clsx(
+        "animate-suggestion-strip-in flex w-full min-w-0 items-center gap-1",
+        placement === "inline" ? "pl-1 pr-2" : "px-3 py-1.5",
+      )}
     >
       <AiSparkleIcon size={13} className="shrink-0 text-slack-text-muted" />
       <span

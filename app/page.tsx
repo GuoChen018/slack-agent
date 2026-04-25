@@ -10,6 +10,8 @@ import { ThreadPane } from "@/components/thread/ThreadPane";
 import { AgentPane } from "@/components/agent/AgentPane";
 import { QuickSwitcher } from "@/components/QuickSwitcher";
 import { MentionHoverCard } from "@/components/MentionHoverCard";
+import { VariantPalette } from "@/components/VariantPalette";
+import { VariantBadge } from "@/components/VariantBadge";
 import { useSlackStore } from "@/lib/store";
 
 export default function SlackApp() {
@@ -33,6 +35,8 @@ export default function SlackApp() {
       </div>
       <QuickSwitcher />
       <MentionHoverCard />
+      <VariantPalette />
+      <VariantBadge />
     </div>
   );
 }
