@@ -561,6 +561,18 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
 
   return (
     <div className="p-5">
+      {/* Above-input suggestion variant: pills float in the gutter ABOVE
+          the composer card itself, not inside it. That gives the chips a
+          true "hovering above the search" feel rather than reading as a
+          band attached to the top of the input. */}
+      {suggestionStripEnabled &&
+        suggestionPlacement === "above-input" &&
+        suggestState === "ready" &&
+        suggested.length > 0 && (
+          <div className="mb-2">
+            {renderSuggestionStrip("above-input")}
+          </div>
+        )}
       <div
         className={clsx(
           "relative flex flex-col rounded-lg border border-slack-border-strong bg-white",
@@ -570,18 +582,6 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
         {showToolbar && (
           <FormattingToolbar exec={execCmd} onToggle={() => setShowToolbar(false)} />
         )}
-
-        {suggestionStripEnabled &&
-          suggestionPlacement === "above-input" &&
-          suggestState === "ready" &&
-          suggested.length > 0 && (
-            // No container background or border — each chip is its own
-            // floating pill. The wrapper just provides a pad so the pills
-            // breathe between the input and the (optional) formatting bar.
-            <div className="px-3 pt-2 pb-1">
-              {renderSuggestionStrip("above-input")}
-            </div>
-          )}
 
         <div
           ref={inputRef}

@@ -43,10 +43,10 @@ export function VariantBadge() {
   return (
     <button
       onClick={() => setOpen(true)}
-      // Tucked into the bottom-right gutter so it stays out of the composer
-      // and the agent pane footer. Icon-only by design — the label and
-      // current values surface in the native title tooltip on hover.
-      className="fixed bottom-7 right-7 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-slack-border bg-white text-slack-text-muted shadow-sm transition-colors hover:bg-slack-pane-hover hover:text-slack-text"
+      // Tucked all the way into the bottom-right corner so it stays out of
+      // the way of the composer and the agent pane. Icon-only by design —
+      // the current values surface in the native title tooltip on hover.
+      className="fixed bottom-3 right-3 z-50 flex h-8 w-8 items-center justify-center rounded-full border border-slack-border bg-white text-slack-text-muted shadow-sm transition-colors hover:bg-slack-pane-hover hover:text-slack-text"
       title={`Switch prototype variant\n\n${summary}`}
       aria-label="Switch prototype variant"
     >
