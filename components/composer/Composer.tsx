@@ -117,27 +117,31 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
 
   const allMessages = useSlackStore((s) => s.messages);
   const allUsers = useSlackStore((s) => s.users);
-  // Agents that have already authored a message in this conversation (top
-  // level OR thread replies) are considered "established" — the user knows
-  // they exist and how to reach them, so we suppress them from auto-
-  // suggestions. Stops the strip from re-pitching Agentforce when the user
-  // is reporting back ("Hi team, I just updated Salesforce…") about an
-  // action the agent already completed.
+  const agentThreads = useSlackStore((s) => s.agentThreads);
+  // Agents the user has already interacted with — either a public reply in
+  // any channel/thread, OR a private reply in the side-pane DM (which lives
+  // in `agentThreads`, not `messages`). Once the user has seen what an agent
+  // can do, the suggestion strip stops re-pitching it. Discovery is one-shot:
+  // pre-introduction we lean in, post-introduction we step back.
   const establishedAgentIds = useMemo(() => {
     const ids: Record<string, true> = {};
+    // Public messages anywhere — channel messages, thread replies. Scope is
+    // intentionally not constrained to the active channel so an agent the
+    // user has already met in #other-room doesn't get pitched here either.
     for (const m of Object.values(allMessages)) {
       if (m.ephemeralFor) continue;
-      // Top-level message in this channel, or a thread reply whose parent
-      // lives in this channel.
-      const inChannel =
-        m.conversationId === convId ||
-        (m.threadId && allMessages[m.threadId]?.conversationId === convId);
-      if (!inChannel) continue;
       const author = allUsers[m.authorId];
       if (author?.isAgent) ids[m.authorId] = true;
     }
+    // Private agent-pane DMs: any thread that contains at least one
+    // agent-authored message counts as an introduction.
+    for (const [agentId, thread] of Object.entries(agentThreads)) {
+      if (thread?.some((m) => m.role === "agent" && m.text.length > 0)) {
+        ids[agentId] = true;
+      }
+    }
     return ids;
-  }, [allMessages, allUsers, convId]);
+  }, [allMessages, allUsers, agentThreads]);
   const establishedAgentIdsRef = useRef(establishedAgentIds);
   useEffect(() => {
     establishedAgentIdsRef.current = establishedAgentIds;
