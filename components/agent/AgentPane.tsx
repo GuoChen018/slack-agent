@@ -1,8 +1,15 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, Clock, ExternalLink, MoreHorizontal, X } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import {
+  Check,
+  Clock,
+  Copy,
+  ExternalLink,
+  MoreHorizontal,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Composer } from "@/components/composer/Composer";
 import { AiSparkleIcon } from "@/components/icons/AiSparkleIcon";
@@ -172,16 +179,8 @@ export function AgentPane() {
                          * that's only the Salesforce update), swap the
                          * suggested follow-ups for a single "View in
                          * Salesforce" link so the demo lands the punchline. */}
-                        {hasConfirmedAction && agent.id === "agent_agentforce" ? (
-                          <a
-                            href="https://salesforce.com"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex h-7 items-center gap-1.5 rounded-md border border-slack-border bg-white px-3 text-[12px] text-slack-text hover:bg-slack-pane-hover"
-                          >
-                            View in Salesforce
-                            <ExternalLink size={12} className="text-slack-text-muted" />
-                          </a>
+                        {hasConfirmedAction && agent.id === "_agentforce" ? (
+                          <PostConfirmActions />
                         ) : (
                           actions.map((a) => (
                             <button
@@ -446,5 +445,69 @@ function SetupScreen({
         access at any time from Slack settings.
       </p>
     </div>
+  );
+}
+
+/** Final-step CTAs after Agentforce successfully writes back: a real
+ *  external link to the SFDC record + a Copy link button so Jordan can
+ *  paste the record URL into a follow-up channel message. We use a
+ *  realistic-looking SFDC opportunity URL so paste-into-input shows a
+ *  link that reads as the actual record. */
+const SFDC_RECORD_URL =
+  "https://acme.lightning.force.com/lightning/r/Opportunity/006Hp00001AcmeP/view";
+
+function PostConfirmActions() {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      // navigator.clipboard works in modern browsers on https + localhost.
+      // Fallback to a temp textarea if it fails, so the demo doesn't break.
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(SFDC_RECORD_URL);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = SFDC_RECORD_URL;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // No-op — clipboard write failed (permissions, etc.). Demo still shows
+      // the link in the toast button via the View-in-Salesforce CTA.
+    }
+  };
+  return (
+    <>
+      <a
+        href={SFDC_RECORD_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="flex h-7 items-center gap-1.5 rounded-md border border-slack-border bg-white px-3 text-[12px] text-slack-text hover:bg-slack-pane-hover"
+      >
+        View in Salesforce
+        <ExternalLink size={12} className="text-slack-text-muted" />
+      </a>
+      <button
+        onClick={handleCopy}
+        className="flex h-7 items-center gap-1.5 rounded-md border border-slack-border bg-white px-3 text-[12px] text-slack-text hover:bg-slack-pane-hover"
+      >
+        {copied ? (
+          <>
+            <Check size={12} className="text-slack-green" />
+            Copied
+          </>
+        ) : (
+          <>
+            <Copy size={12} className="text-slack-text-muted" />
+            Copy link
+          </>
+        )}
+      </button>
+    </>
   );
 }
