@@ -575,7 +575,10 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
           suggestionPlacement === "above-input" &&
           suggestState === "ready" &&
           suggested.length > 0 && (
-            <div className="border-b border-slack-border bg-slack-pane-alt/40">
+            // No container background or border — each chip is its own
+            // floating pill. The wrapper just provides a pad so the pills
+            // breathe between the input and the (optional) formatting bar.
+            <div className="px-3 pt-2 pb-1">
               {renderSuggestionStrip("above-input")}
             </div>
           )}

@@ -32,23 +32,6 @@ export function VariantPalette() {
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
 
-  // Cmd/Ctrl+Shift+K opens the palette. Cmd+K stays on the conversation
-  // QuickSwitcher so we don't trample a real Slack pattern.
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      const isToggle =
-        (e.metaKey || e.ctrlKey) &&
-        e.shiftKey &&
-        e.key.toLowerCase() === "k";
-      if (isToggle) {
-        e.preventDefault();
-        setOpen(!useSlackStore.getState().variantPaletteOpen);
-      }
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [setOpen]);
-
   const rows: Row[] = useMemo(() => {
     const out: Row[] = [];
     for (const axis of VARIANT_OPTIONS) {
@@ -221,8 +204,7 @@ export function VariantPalette() {
         <div className="border-t border-slack-border bg-slack-pane-alt px-3 py-1.5 text-[11px] text-slack-text-muted">
           <kbd className="rounded border border-slack-border bg-white px-1">↵</kbd> apply ·{" "}
           <kbd className="rounded border border-slack-border bg-white px-1">↑↓</kbd> navigate ·{" "}
-          <kbd className="rounded border border-slack-border bg-white px-1">esc</kbd> close ·{" "}
-          <kbd className="rounded border border-slack-border bg-white px-1">⌘⇧K</kbd> toggle
+          <kbd className="rounded border border-slack-border bg-white px-1">esc</kbd> close
         </div>
       </div>
     </div>

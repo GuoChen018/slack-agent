@@ -37,21 +37,20 @@ export function VariantBadge() {
 
   const summary = VARIANT_OPTIONS.map((axis) => {
     const current = axis.options.find((o) => o.value === variants[axis.key]);
-    return current?.label ?? "—";
-  }).join(" · ");
+    return `${axis.label}: ${current?.label ?? "—"}`;
+  }).join("\n");
 
   return (
     <button
       onClick={() => setOpen(true)}
-      className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border border-slack-border bg-white px-3 py-1.5 text-[12px] text-slack-text shadow-sm hover:bg-slack-pane-hover"
-      title="Switch prototype variant (⌘⇧K)"
+      // Tucked into the bottom-right gutter so it stays out of the composer
+      // and the agent pane footer. Icon-only by design — the label and
+      // current values surface in the native title tooltip on hover.
+      className="fixed bottom-7 right-7 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-slack-border bg-white text-slack-text-muted shadow-sm transition-colors hover:bg-slack-pane-hover hover:text-slack-text"
+      title={`Switch prototype variant\n\n${summary}`}
+      aria-label="Switch prototype variant"
     >
-      <Sliders size={12} className="text-slack-text-muted" />
-      <span className="text-slack-text-muted">Variant:</span>
-      <span className="font-bold">{summary}</span>
-      <kbd className="rounded border border-slack-border bg-slack-pane-alt px-1 text-[10px] text-slack-text-muted">
-        ⌘⇧K
-      </kbd>
+      <Sliders size={14} />
     </button>
   );
 }

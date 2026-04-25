@@ -99,33 +99,44 @@ export function SuggestionStrip({
 
   // `w-full` so the strip claims the full width its parent allots — the
   // ResizeObserver above relies on this to read the *available* width
-  // rather than the strip's collapsed content width. The above-input
-  // variant adds a little extra horizontal padding so the row reads as a
-  // contained band attached to the top of the input field.
+  // rather than the strip's collapsed content width. In above-input mode
+  // we drop the leading label entirely: the floating treatment itself
+  // signals "suggestion" and the row reads cleaner without it.
+  const isFloating = placement === "above-input";
   return (
     <div
       ref={stripRef}
       className={clsx(
-        "animate-suggestion-strip-in flex w-full min-w-0 items-center gap-1",
-        placement === "inline" ? "pl-1 pr-2" : "px-3 py-1.5",
+        "animate-suggestion-strip-in flex w-full min-w-0 items-center gap-2",
+        placement === "inline" ? "pl-1 pr-2" : "",
       )}
     >
-      <AiSparkleIcon size={13} className="shrink-0 text-slack-text-muted" />
-      <span
+      {!isFloating && (
+        <>
+          <AiSparkleIcon size={13} className="shrink-0 text-slack-text-muted" />
+          <span
+            className={clsx(
+              "shrink-0 text-[11px] font-bold uppercase tracking-wide",
+              shimmering ? "shimmer-text-once" : "text-slack-text-muted",
+            )}
+          >
+            Suggested
+          </span>
+        </>
+      )}
+      <div
         className={clsx(
-          "shrink-0 text-[11px] font-bold uppercase tracking-wide",
-          shimmering ? "shimmer-text-once" : "text-slack-text-muted",
+          "flex min-w-0 items-center",
+          isFloating ? "gap-2" : "ml-1 gap-1",
         )}
       >
-        Suggested
-      </span>
-      <div className="ml-1 flex min-w-0 items-center gap-1">
         {agents.map((agent) => (
           <SuggestionChip
             key={agent.id}
             agent={agent}
             active={hover?.agent.id === agent.id}
             compact={compact}
+            floating={isFloating}
             onApply={() => {
               cancelHide();
               setHover(null);
@@ -170,6 +181,7 @@ function SuggestionChip({
   agent,
   active,
   compact,
+  floating,
   onApply,
   onDismiss,
   onEnter,
@@ -178,6 +190,7 @@ function SuggestionChip({
   agent: AgentMeta;
   active: boolean;
   compact: boolean;
+  floating: boolean;
   onApply: () => void;
   onDismiss: () => void;
   onEnter: (rect: DOMRect) => void;
@@ -194,16 +207,27 @@ function SuggestionChip({
       }}
       onMouseLeave={onLeave}
       title={compact ? `@${agent.displayName}` : undefined}
+      // Floating variant: pill-shaped, white bg, real shadow, solid border.
+      // Reads as an individual floating object rather than part of a row.
+      // Inline variant: the original dashed-border treatment that lives in
+      // the toolbar.
       className={clsx(
-        "group flex h-6 shrink-0 items-center overflow-hidden rounded-md border border-dashed border-slack-border-strong text-[12px] transition-colors",
-        active ? "bg-slack-pane-hover" : "bg-white hover:bg-slack-pane-hover",
+        "group flex h-7 shrink-0 items-center overflow-hidden text-[12px] transition-colors",
+        floating
+          ? "rounded-full border border-slack-border bg-white shadow-sm hover:border-slack-border-strong hover:shadow"
+          : clsx(
+              "h-6 rounded-md border border-dashed border-slack-border-strong",
+              active ? "bg-slack-pane-hover" : "bg-white hover:bg-slack-pane-hover",
+            ),
       )}
     >
       <button
         onClick={onApply}
         className={clsx(
-          "flex h-full items-center rounded-l-md text-slack-text",
-          compact ? "gap-0 px-1.5" : "gap-1.5 pr-1.5 pl-2",
+          "flex h-full items-center text-slack-text",
+          floating
+            ? "gap-1.5 pl-2.5 pr-2"
+            : clsx("rounded-l-md", compact ? "gap-0 px-1.5" : "gap-1.5 pr-1.5 pl-2"),
         )}
       >
         {agent.avatarUrl && !imgFailed ? (
