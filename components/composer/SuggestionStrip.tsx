@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { AgentMeta } from "@/lib/agents";
 import { AiSparkleIcon } from "@/components/icons/AiSparkleIcon";
 import { SuggestionHoverCard } from "./SuggestionHoverCard";
@@ -26,6 +26,16 @@ interface Props {
    * so subsequent re-renders don't try to re-trigger. */
   shimmer: boolean;
   placement?: SuggestionPlacement;
+  /** When false, skip the entrance fade-up animation. Used in thread mode
+   * where chips are seeded from the parent message and should simply *be*
+   * there as the pane mounts — fading them in feels delayed since the user
+   * didn't initiate the suggestion themselves. */
+  animateEntrance?: boolean;
+  /** Index of the chip the user has navigated to via keyboard (↑ from the
+   * input). When set, the chip renders with a focused-style border and
+   * Enter applies it from the parent's keydown handler. `null` = no chip is
+   * keyboard-focused (default; caret is in the input). */
+  activeIndex?: number | null;
   onApply: (agent: AgentMeta) => void;
   onDismiss: (agent: AgentMeta) => void;
   onMessageAgent: (agent: AgentMeta) => void;
@@ -38,6 +48,8 @@ export function SuggestionStrip({
   agents,
   shimmer,
   placement = "inline",
+  animateEntrance = true,
+  activeIndex = null,
   onApply,
   onDismiss,
   onMessageAgent,
@@ -107,7 +119,8 @@ export function SuggestionStrip({
     <div
       ref={stripRef}
       className={clsx(
-        "animate-suggestion-strip-in flex w-full min-w-0 items-center gap-2",
+        "flex w-full min-w-0 items-center gap-2",
+        animateEntrance && "animate-suggestion-strip-in",
         placement === "inline" ? "pl-1 pr-2" : "",
       )}
     >
@@ -130,11 +143,13 @@ export function SuggestionStrip({
           isFloating ? "gap-2" : "ml-1 gap-1",
         )}
       >
-        {agents.map((agent) => (
+        {agents.map((agent, idx) => (
           <SuggestionChip
             key={agent.id}
             agent={agent}
             active={hover?.agent.id === agent.id}
+            keyboardFocused={activeIndex === idx}
+            isFirst={idx === 0}
             compact={compact}
             floating={isFloating}
             onApply={() => {
@@ -180,6 +195,8 @@ export function SuggestionStrip({
 function SuggestionChip({
   agent,
   active,
+  keyboardFocused,
+  isFirst,
   compact,
   floating,
   onApply,
@@ -189,6 +206,12 @@ function SuggestionChip({
 }: {
   agent: AgentMeta;
   active: boolean;
+  /** True when the user has navigated to this chip via the keyboard (↑).
+   * Renders a focused-style border so it's clear which chip Enter applies. */
+  keyboardFocused: boolean;
+  /** True only for the first chip — used to render the discoverability
+   * keycap "↑" so users learn the shortcut without a separate hint. */
+  isFirst: boolean;
   compact: boolean;
   floating: boolean;
   onApply: () => void;
@@ -214,10 +237,21 @@ function SuggestionChip({
       className={clsx(
         "group flex h-7 shrink-0 items-center overflow-hidden text-[12px] transition-colors",
         floating
-          ? "rounded-full border border-slack-border bg-white shadow-sm hover:border-slack-border-strong hover:shadow"
+          ? // Custom soft shadow — `shadow-sm` reads too pronounced against
+            // the channel background; this is closer to the very subtle drop
+            // Slack uses on hover cards and toast pills.
+            clsx(
+              "rounded-full border bg-white shadow-[0_1px_2px_rgba(15,20,25,0.04)] hover:border-slack-border-strong hover:shadow-[0_2px_4px_rgba(15,20,25,0.06)]",
+              keyboardFocused
+                ? "border-slack-text ring-2 ring-slack-text/15"
+                : "border-slack-border",
+            )
           : clsx(
               "h-6 rounded-md border border-dashed border-slack-border-strong",
-              active ? "bg-slack-pane-hover" : "bg-white hover:bg-slack-pane-hover",
+              active || keyboardFocused
+                ? "bg-slack-pane-hover"
+                : "bg-white hover:bg-slack-pane-hover",
+              keyboardFocused && "ring-2 ring-slack-text/15",
             ),
       )}
     >
@@ -226,10 +260,20 @@ function SuggestionChip({
         className={clsx(
           "flex h-full items-center text-slack-text",
           floating
-            ? "gap-1.5 pl-2.5 pr-2"
+            ? "gap-1.5 pl-2 pr-2"
             : clsx("rounded-l-md", compact ? "gap-0 px-1.5" : "gap-1.5 pr-1.5 pl-2"),
         )}
       >
+        {/* Floating pills get a leading `+` so the action is obvious at a
+            glance — without it, an icon + name reads as a static badge.
+            Faint color keeps it from competing with the agent identity. */}
+        {floating && (
+          <Plus
+            size={12}
+            strokeWidth={2.2}
+            className="shrink-0 text-slack-text-muted"
+          />
+        )}
         {agent.avatarUrl && !imgFailed ? (
           <img
             src={agent.avatarUrl}
@@ -247,7 +291,7 @@ function SuggestionChip({
             {agent.displayName.slice(0, 1)}
           </span>
         )}
-        {!compact && <span className="font-medium">@{agent.displayName}</span>}
+        {!compact && <span className="font-medium">{agent.displayName}</span>}
       </button>
       {/* Dismiss button — uses width + opacity so the chip smoothly expands
           on hover instead of snapping in. The X has its own concentric
@@ -260,7 +304,7 @@ function SuggestionChip({
             onClick={onDismiss}
             aria-label={`Dismiss ${agent.displayName}`}
             tabIndex={active ? 0 : -1}
-            className="flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded text-slack-text-muted transition-colors hover:bg-black/5 hover:text-slack-text"
+            className="flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full text-slack-text-muted transition-colors hover:bg-black/5 hover:text-slack-text"
           >
             <X size={12} strokeWidth={2.4} />
           </button>

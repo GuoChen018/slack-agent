@@ -29,8 +29,11 @@ export function ThreadPane() {
 
   return (
     <aside
-      className="relative ml-1.5 flex h-full shrink-0 flex-col overflow-hidden rounded-lg bg-white"
-      style={{ width }}
+      // Allow the pane to shrink when the channel + thread + agent panes
+      // are all open together; `width` is the preferred/dragged width and
+      // `minWidth` is the floor before the pane contracts further.
+      className="relative ml-1.5 flex h-full flex-col overflow-hidden rounded-lg bg-white"
+      style={{ width, minWidth: 280, flexShrink: 1 }}
     >
       <RightPaneResizer />
       <header className="flex h-[50px] items-center justify-between border-b border-slack-border px-4">
@@ -62,7 +65,7 @@ export function ThreadPane() {
         ))}
       </div>
 
-      <div className="border-t border-slack-border">
+      <div>
         <Composer threadParentId={parentId} placeholder="Reply…" />
       </div>
     </aside>

@@ -91,8 +91,13 @@ export function AgentPane() {
 
   return (
     <aside
-      className="relative ml-1.5 flex h-full shrink-0 flex-col overflow-hidden rounded-lg bg-white"
-      style={{ width }}
+      // Right panes flex-shrink with the main pane: when the user has both
+      // a thread and an agent open at the same time on a narrower window,
+      // we let the right panes contract toward `minWidth` so the channel
+      // itself stays usable. Drag-resizing still updates `rightPaneWidth`,
+      // which acts as the preferred (max) width here.
+      className="relative ml-1.5 flex h-full flex-col overflow-hidden rounded-lg bg-white"
+      style={{ width, minWidth: 280, flexShrink: 1 }}
     >
       <RightPaneResizer />
       <header className="flex h-[50px] items-center justify-between border-b border-slack-border px-4">

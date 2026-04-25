@@ -40,6 +40,11 @@ export interface AgentMeta extends User {
    * auto-replies in the resulting thread. `priorAgentIds` lets later agents
    * cite earlier ones without breaking the illusion of sequencing. */
   channelReply: (draftText: string, priorAgentIds: AgentId[]) => string[];
+  /** Short, agent-flavored prefill text inserted after the @mention when a
+   * user clicks an agent pill on an *empty* draft. Lets a single click in a
+   * thread turn into a complete, sendable question without typing.
+   * Phrased so it implicitly references the thread the user is already in. */
+  threadPrompt: string;
 }
 
 // Direct, high-resolution logo URLs scraped from each brand's site
@@ -95,6 +100,7 @@ export const AGENTS: AgentMeta[] = [
         "• 38:51 — Lisa: \"I'd want to see ROI within two quarters before approving the upgrade tier.\"",
       ];
     },
+    threadPrompt: "anything from recent calls worth flagging here?",
     contextualActions: [
       {
         id: "gong-pricing",
@@ -176,6 +182,7 @@ export const AGENTS: AgentMeta[] = [
       "• Follow-up task logged for Jamie (due Friday)\n\n",
       "All linked to today's call — anyone in #eval-acme-corp can review.",
     ],
+    threadPrompt: "anything I should update in Salesforce based on this?",
     contextualActions: [
       {
         id: "af-update-opp",
@@ -264,6 +271,7 @@ export const AGENTS: AgentMeta[] = [
     channelReply: (_draft, _prior) => [
       "Drafted a follow-up to Jamie based on the call. Subject: \"Airflow comparison + phased pricing\". I'll wait for the green light before sending.",
     ],
+    threadPrompt: "can you draft a quick recap of this?",
     contextualActions: [
       {
         id: "mo-followup-email",
@@ -327,6 +335,7 @@ export const AGENTS: AgentMeta[] = [
     channelReply: (_draft, _prior) => [
       "Acme is in commit at $180k. Slipping it puts the team at 71% of plan this quarter.",
     ],
+    threadPrompt: "does this change the forecast picture?",
     contextualActions: [
       {
         id: "cl-forecast",
@@ -369,6 +378,7 @@ export const AGENTS: AgentMeta[] = [
     channelReply: (_draft, _prior) => [
       "Drafted a 4-step sequence on Acme. I'll hold it as a draft until you say go.",
     ],
+    threadPrompt: "should we adjust the active sequence based on this?",
     contextualActions: [
       {
         id: "or-sequence",
@@ -410,6 +420,7 @@ export const AGENTS: AgentMeta[] = [
     channelReply: (_draft, _prior) => [
       "3 objections from today's call: timeline confidence, build-vs-buy on Airflow, and year-two pricing.",
     ],
+    threadPrompt: "any objection moments or competitor mentions on this from recent calls?",
     contextualActions: [
       {
         id: "ch-objections",
@@ -436,7 +447,21 @@ export const AGENTS_BY_ID: Record<string, AgentMeta> = AGENTS.reduce(
  * heuristic intentionally simple: count distinct trigger hits, break ties by
  * the agent's order in AGENTS.
  */
-export function suggestAgentsForDraft(text: string, max = 3): AgentMeta[] {
+export interface SuggestOptions {
+  max?: number;
+  /** Minimum number of distinct trigger hits required for an agent to be
+   * surfaced. Defaults to 2 (the standard "active typing" bar). The thread
+   * composer drops this to 1 when seeding from the parent message — that
+   * surface is opt-in (the user just opened the thread), so we can afford
+   * to be more permissive without feeling noisy. */
+  minScore?: number;
+}
+
+export function suggestAgentsForDraft(
+  text: string,
+  options: SuggestOptions = {},
+): AgentMeta[] {
+  const { max = 3, minScore = 2 } = options;
   const draft = text.trim();
   if (draft.length < 25) return [];
   const scored: { agent: AgentMeta; score: number }[] = [];
@@ -445,10 +470,7 @@ export function suggestAgentsForDraft(text: string, max = 3): AgentMeta[] {
     for (const re of agent.triggers) {
       if (re.test(draft)) score += 1;
     }
-    // Only surface an agent once the draft hits at least two of its triggers.
-    // That filters out weak/single-keyword matches that would otherwise pad
-    // the strip with low-relevance suggestions.
-    if (score >= 2) scored.push({ agent, score });
+    if (score >= minScore) scored.push({ agent, score });
   }
   scored.sort((a, b) => b.score - a.score);
   // Only include agents within 1 point of the top score. Without this we

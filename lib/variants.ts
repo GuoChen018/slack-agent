@@ -17,7 +17,7 @@ export interface VariantState {
 }
 
 export const DEFAULT_VARIANTS: VariantState = {
-  suggestionPlacement: "inline",
+  suggestionPlacement: "above-input",
 };
 
 export interface VariantAxis<K extends keyof VariantState = keyof VariantState> {
@@ -39,22 +39,24 @@ export const VARIANT_OPTIONS: ReadonlyArray<VariantAxis> = [
       "Where agent suggestions appear while you're drafting a message.",
     options: [
       {
-        value: "inline",
-        label: "Inline (in toolbar)",
-        description:
-          "Chips share the composer footer with the formatting toolbar.",
-      },
-      {
         value: "above-input",
         label: "Above input (floating)",
         description:
           "Chips sit above the input field, like file upload chips or link previews.",
       },
+      {
+        value: "inline",
+        label: "Inline (in toolbar)",
+        description:
+          "Chips share the composer footer with the formatting toolbar.",
+      },
     ],
   },
 ];
 
-export const VARIANTS_STORAGE_KEY = "slack-agent.variants.v1";
+// Bumped when the default flips, so returning visitors see the new default
+// instead of being stuck on the previously-persisted choice.
+export const VARIANTS_STORAGE_KEY = "slack-agent.variants.v2";
 
 export function loadVariantsFromStorage(): VariantState {
   if (typeof window === "undefined") return DEFAULT_VARIANTS;

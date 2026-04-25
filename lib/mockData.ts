@@ -380,6 +380,132 @@ export const initialMessages: Message[] = [
 
   // --- #marketing ---
   m("c_marketing", "u_dorothy", "Launch post draft is in Drive. Feedback by Friday please.", 6 * hr),
+  m("c_marketing", "u_charlie", "Skimmed it — the \"why now\" section is the strongest part. I'd lead with that.", 5 * hr + 30 * min),
+  m("c_marketing", "u_dorothy", "Good call. I'll restructure tomorrow morning.", 5 * hr + 20 * min, {
+    reactions: [{ emoji: "👍🏻", userIds: ["u_charlie"] }],
+  }),
+  m("c_marketing", "u_you", "Happy to do a design pass once the copy lands.", 4 * hr + 50 * min),
+
+  // --- #product ---
+  m(
+    "c_product",
+    "u_charlie",
+    "Q3 planning kicked off this morning. Top three asks from the field so far:\n• Better deal-room context for AEs\n• Pipeline hygiene reminders\n• Smarter email drafts in Slack",
+    1 * day + 4 * hr,
+    {
+      reactions: [{ emoji: "📌", userIds: ["u_dana", "u_you"] }],
+      replyCount: 3,
+      replyUserIds: ["u_dana", "u_you"],
+      lastReplyAt: now - (1 * day + 1 * hr),
+    },
+  ),
+  m(
+    "c_product",
+    "u_dana",
+    "On (1) — the top blocker isn't the agents, it's that AEs can't tell what context is being used. Even a tiny \"using your last 5 calls\" badge would help.",
+    1 * day + 3 * hr,
+  ),
+  m(
+    "c_product",
+    "u_you",
+    "Sketching this. Going to pull patterns from notion / linear's command bar — they both expose the context they're acting on.",
+    1 * day + 2 * hr + 30 * min,
+  ),
+  m("c_product", "u_charlie", "Loop in Dana for the API piece — she's seen all the Acme pushback firsthand.", 1 * day + 2 * hr),
+  m(
+    "c_product",
+    "u_dorothy",
+    "Side note: marketing wants a clear \"what's new in Slack agents\" page by mid-Q3. Easier if we lock the v1 list this week.",
+    8 * hr,
+    { reactions: [{ emoji: "💯", userIds: ["u_charlie"] }] },
+  ),
+  m("c_product", "u_charlie", "Locking it Friday. Async review in this channel Thursday EOD.", 7 * hr),
+
+  // --- #sales_qa ---
+  m(
+    "c_sales_qa",
+    "u_rachel",
+    "Reminder: please log call outcomes the same day. Forecast review is only as good as the data.",
+    2 * day,
+    { reactions: [{ emoji: "🙏🏻", userIds: ["u_charlie"] }] },
+  ),
+  m(
+    "c_sales_qa",
+    "u_charlie",
+    "Q from a new AE: when do we offer the security questionnaire vs make the prospect ask? Default is \"on request\" right?",
+    1 * day + 6 * hr,
+  ),
+  m(
+    "c_sales_qa",
+    "u_mike",
+    "On request, unless they're regulated (fin, health, gov). Then we lead with it. Ask security@ if you're unsure on a specific account.",
+    1 * day + 5 * hr + 30 * min,
+    { reactions: [{ emoji: "✅", userIds: ["u_charlie", "u_rachel"] }] },
+  ),
+  m(
+    "c_sales_qa",
+    "u_rachel",
+    "Adding to the deal-desk doc. Will repost the link tomorrow.",
+    1 * day + 5 * hr,
+  ),
+  m(
+    "c_sales_qa",
+    "u_charlie",
+    "Also — has anyone done the new MEDDPICC training? Worth the time?",
+    5 * hr,
+  ),
+  m(
+    "c_sales_qa",
+    "u_mike",
+    "Shorter than I expected. Watch sections 2 and 4 and skip the rest.",
+    4 * hr + 30 * min,
+  ),
+
+  // --- #fundraising ---
+  m(
+    "c_fundraising",
+    "u_mike",
+    "Investor update for April is drafted. Hitting all of you with a request for one number each:\n• ARR\n• Net new logos\n• Top deal in motion",
+    1 * day + 8 * hr,
+  ),
+  m("c_fundraising", "u_you", "Will get the design milestones to you by EOD.", 1 * day + 7 * hr + 30 * min),
+  m(
+    "c_fundraising",
+    "u_mike",
+    "Also — Sequoia partner meeting moved to next Wed. Pushing the data room refresh up a week.",
+    6 * hr,
+    { reactions: [{ emoji: "👀", userIds: ["u_you"] }] },
+  ),
+  m(
+    "c_fundraising",
+    "u_mike",
+    "If any of you have customer quotes / ROI numbers in flight, drop them here. Even rough is fine.",
+    5 * hr + 50 * min,
+  ),
+
+  // --- #leadership ---
+  m(
+    "c_leadership",
+    "u_mike",
+    "Hiring plan for H2 is going to the board on Monday. Headcount stays flat, mix shifts toward GTM. We can argue for one more design role if Jordan wants to make the case.",
+    1 * day + 10 * hr,
+  ),
+  m(
+    "c_leadership",
+    "u_charlie",
+    "Backing the design ask. The agent surfaces are where we're spending the most time and we're stretched.",
+    1 * day + 9 * hr + 30 * min,
+    { reactions: [{ emoji: "🙏🏻", userIds: ["u_you"] }] },
+  ),
+  m("c_leadership", "u_you", "Putting a one-pager together this week. Will share Friday.", 1 * day + 9 * hr),
+  m("c_leadership", "u_mike", "Quarterly review prep — anything we want to flag before the board read-out?", 6 * hr),
+  m(
+    "c_leadership",
+    "u_charlie",
+    "Acme pivot is the headline. Up from $80k to $180k in scope, close date pushed but still in quarter.",
+    5 * hr + 40 * min,
+    { reactions: [{ emoji: "🔥", userIds: ["u_mike"] }] },
+  ),
 
   // --- DMs ---
   m("dm_decio", "u_decio", "Got a sec to review the Acme deck before I send?", 45 * min),
@@ -389,6 +515,41 @@ export const initialMessages: Message[] = [
   m("dm_isabella", "u_isabella", "MSA redlines are back, nothing crazy. Will send a summary.", 50 * min),
   m("dm_slackbot", "u_slackbot", "Hi there 👋 Try `/remind me to drink water every 2 hours`.", 3 * day),
   m("dm_agent", "u_agent", "Hey Jordan, I'm your Slack Agent. Ask me anything, or type `/` to see what I can do.", 5 * min),
+
+  // Daniel — strategic deals back-and-forth
+  m("dm_daniel", "u_daniel", "Hey — quick gut check on the Acme phasing approach?", 1 * day + 5 * hr),
+  m("dm_daniel", "u_you", "Of course, send it over.", 1 * day + 4 * hr + 50 * min),
+  m(
+    "dm_daniel",
+    "u_daniel",
+    "Year-one capped at $180k, year-two true-up to $260k if usage hits 70% of committed. Lisa hasn't seen this yet — wanted to pressure-test the framing first.",
+    1 * day + 4 * hr + 40 * min,
+  ),
+  m(
+    "dm_daniel",
+    "u_you",
+    "Lead with \"phased rollout\" not \"capped pricing\" — the framing matters. The capped piece reads as a hedge if it's first.",
+    1 * day + 4 * hr + 20 * min,
+    { reactions: [{ emoji: "🙏🏻", userIds: ["u_daniel"] }] },
+  ),
+  m("dm_daniel", "u_daniel", "Solid. Reworking the deck now. Will share before the call.", 1 * day + 4 * hr),
+  m("dm_daniel", "u_daniel", "Also — Jamie's question about Airflow. Got an answer ready or do we need an SE?", 2 * hr + 30 * min),
+
+  // Marilyn — quick deal desk ping
+  m(
+    "dm_marilyn",
+    "u_marilyn",
+    "Acme exception request approved. Up to 12% off list with the phased pricing.",
+    4 * hr + 30 * min,
+    { reactions: [{ emoji: "🎉", userIds: ["u_you"] }] },
+  ),
+  m("dm_marilyn", "u_you", "Amazing, thank you. Updating the proposal now.", 4 * hr + 20 * min),
+  m(
+    "dm_marilyn",
+    "u_marilyn",
+    "Standard caveat — needs to close in quarter, otherwise re-approval. Just so you know.",
+    4 * hr + 10 * min,
+  ),
 ];
 
 // Wire up thread replies for the Dorothy "side evaluation" message
@@ -401,6 +562,39 @@ if (parent) {
     m("c_eval_acme", "u_mike", "Let's ask them directly on the call. Polite but direct.", 52 * min, { threadId: parent.id }),
     m("c_eval_acme", "u_dana", "I can cover the \"how we compare\" angle if it comes up.", 51 * min, { threadId: parent.id }),
     m("c_eval_acme", "u_charlie", "Perfect. We'll loop back after.", 50 * min, { threadId: parent.id }),
+  );
+}
+
+// Wire up thread replies for the #product Q3 planning kickoff
+const productPlanningParent = initialMessages.find(
+  (msg) =>
+    msg.conversationId === "c_product" &&
+    msg.authorId === "u_charlie" &&
+    msg.text.startsWith("Q3 planning kicked off"),
+);
+if (productPlanningParent) {
+  initialMessages.push(
+    m(
+      "c_product",
+      "u_dana",
+      "Strong list. The deal-room one is going to be the most painful — context lives in 4 systems today.",
+      1 * day + 3 * hr + 30 * min,
+      { threadId: productPlanningParent.id },
+    ),
+    m(
+      "c_product",
+      "u_you",
+      "I can take the first design pass on (1). Probably want to scope it tight — \"what context, where it's pulled from, how to override\" only.",
+      1 * day + 3 * hr,
+      { threadId: productPlanningParent.id },
+    ),
+    m(
+      "c_product",
+      "u_dana",
+      "+1. Anything more is a Q4 problem.",
+      1 * day + 1 * hr,
+      { threadId: productPlanningParent.id },
+    ),
   );
 }
 

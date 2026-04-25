@@ -94,6 +94,13 @@ interface SlackState {
   rightPaneWidth: number;
   setRightPaneWidth: (w: number) => void;
 
+  /** Threads where the user has explicitly opted out of suggestions (closed
+   * a chip, or added then removed an @mention). Persists for the session so
+   * reopening the thread doesn't re-seed suggestions on a draft they've
+   * already engaged with. Keyed by thread parent message id. */
+  dismissedThreads: Record<MessageId, true>;
+  dismissThreadSuggestions: (parentId: MessageId) => void;
+
   openAgentId: AgentId | null;
   agentThreads: Record<AgentId, AgentMessage[]>;
   /** Per-agent first-run setup gate. Empty by default — every agent shows
@@ -219,6 +226,14 @@ export const useSlackStore = create<SlackState>((set, get) => ({
   rightPaneWidth: 420,
   setRightPaneWidth: (w) =>
     set({ rightPaneWidth: Math.max(320, Math.min(720, Math.round(w))) }),
+
+  dismissedThreads: {},
+  dismissThreadSuggestions: (parentId) =>
+    set((s) =>
+      s.dismissedThreads[parentId]
+        ? s
+        : { dismissedThreads: { ...s.dismissedThreads, [parentId]: true } },
+    ),
 
   openAgentId: null,
   agentThreads: {},

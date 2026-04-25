@@ -69,6 +69,16 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
   const drafts = useSlackStore((s) => s.drafts);
   const setDraft = useSlackStore((s) => s.setDraft);
   const clearDraft = useSlackStore((s) => s.clearDraft);
+  // For thread composers we seed suggestions from the parent message so
+  // chips appear the moment the thread opens — no typing required.
+  const parentMessageText = useSlackStore((s) =>
+    threadParentId ? s.messages[threadParentId]?.text ?? "" : "",
+  );
+  const dismissedThreads = useSlackStore((s) => s.dismissedThreads);
+  const dismissThreadSuggestions = useSlackStore(
+    (s) => s.dismissThreadSuggestions,
+  );
+  const threadDismissed = !!threadParentId && !!dismissedThreads[threadParentId];
 
   const draftKey = agentId
     ? `agent_${agentId}`
@@ -94,14 +104,33 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
   const [suggestState, setSuggestState] = useState<SuggestionState>("idle");
   const [suggested, setSuggested] = useState<AgentMeta[]>([]);
   const [shimmerOnReveal, setShimmerOnReveal] = useState(false);
+  // Index of the suggestion chip the user has navigated to via the keyboard.
+  // null = caret is in the input (default). Number = chip is "focused" and
+  // Enter applies it, ←/→ cycle, Esc/↓ returns focus to the input. Press
+  // ↑ from the input to enter this mode (spatial: the strip lives above
+  // the input, so up-arrow is the natural reach).
+  const [activePillIndex, setActivePillIndex] = useState<number | null>(null);
   const idleTimer = useRef<number | null>(null);
   const shimmerTimer = useRef<number | null>(null);
   // Refs mirror the sticky state so the debounced callback can read the
   // latest values without depending on stale closures.
   const suggestedRef = useRef<AgentMeta[]>([]);
   const suggestStateRef = useRef<SuggestionState>("idle");
+  // Tracks whether an @agent mention has *ever* been present in the current
+  // thread draft. If it was added and later removed, that "added then
+  // deleted" gesture counts as an explicit dismissal — flip the thread into
+  // permanently-dismissed so future visits don't re-suggest.
+  const hadMentionRef = useRef(false);
   useEffect(() => {
     suggestedRef.current = suggested;
+    // Keep keyboard focus index in bounds. If the user dismissed a chip while
+    // it was the active one, fall back to the previous chip; if the strip
+    // emptied entirely, drop out of pill-nav mode.
+    setActivePillIndex((idx) => {
+      if (idx === null) return null;
+      if (suggested.length === 0) return null;
+      return Math.min(idx, suggested.length - 1);
+    });
   }, [suggested]);
   useEffect(() => {
     suggestStateRef.current = suggestState;
@@ -128,6 +157,13 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     setSuggestState("idle");
     setSuggested([]);
     setShimmerOnReveal(false);
+    setActivePillIndex(null);
+    // Re-derive "had mention" from the freshly hydrated draft DOM so a
+    // remount on an existing draft (e.g. switching threads back-and-forth)
+    // doesn't lose the engagement signal.
+    hadMentionRef.current = !!inputRef.current?.querySelector(
+      'span.mention[data-user^="_"]',
+    );
   };
 
   useEffect(() => {
@@ -161,6 +197,12 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     // would stay stuck at "idle" until the user typed another character.
     if (inputRef.current.innerText.trim().length > 0) {
       scheduleSuggestions();
+    } else if (threadParentId && parentMessageText.length > 0) {
+      // Thread just opened with an empty reply draft — seed suggestions from
+      // the parent message so the user sees relevant agents already waiting.
+      // `immediate` skips the typing-debounce so chips are visible the
+      // instant the pane mounts.
+      scheduleSuggestions(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
@@ -261,10 +303,17 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     el.focus();
     // Make sure there's whitespace between the existing draft and the pill.
     const innerText = el.innerText;
+    const draftIsEmpty = innerText.trim().length === 0;
     const needsSpace = innerText.length > 0 && !/\s$/.test(innerText);
+    // When the draft is empty AND we're seeded by a thread context, prefill
+    // a short agent-flavored question so a single click → sendable message.
+    // If the user has already typed something, we never overwrite it — just
+    // append the @mention as before.
+    const prefill = draftIsEmpty && !!threadParentId ? agent.threadPrompt : "";
     const html =
       (needsSpace ? "&nbsp;" : "") +
-      `<span class="mention" data-user="${agent.id}">@${agent.displayName}</span>&nbsp;`;
+      `<span class="mention" data-user="${agent.id}">@${agent.displayName}</span>&nbsp;` +
+      (prefill ? prefill : "");
     const range = document.createRange();
     range.selectNodeContents(el);
     range.collapse(false);
@@ -287,6 +336,12 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
         sel.addRange(newRange);
       }
     }
+    // `range.insertNode` doesn't fire React's onInput, so the next call to
+    // `scheduleSuggestions` (when the user types/deletes) would otherwise
+    // see `hadMentionRef.current === false` and miss the "added it then
+    // deleted it" path. Mark it explicitly here so deleting the freshly
+    // inserted pill text persists the dismissal for this thread.
+    hadMentionRef.current = true;
     persistDraft();
     // Don't auto-dismiss the whole strip — the caller decides whether to
     // remove just this agent (chip apply) or close the strip entirely.
@@ -294,6 +349,58 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Suggestion-strip keyboard navigation. Pills sit visually above the
+    // input, so ↑ is the natural way to "reach" them from inside the field.
+    // Once a pill is keyboard-focused, ←/→ cycle, Enter applies, Esc/↓
+    // returns to the input. We deliberately *don't* claim Tab — Tab feels
+    // wrong here (the strip isn't downstream in tab order, it's overhead).
+    const stripVisible =
+      !agentId && suggestState === "ready" && suggested.length > 0;
+    if (activePillIndex !== null && stripVisible) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const agent = suggested[activePillIndex];
+        if (agent) {
+          insertMentionAtEnd(agent);
+          setSuggested((prev) => prev.filter((x) => x.id !== agent.id));
+        }
+        setActivePillIndex(null);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setActivePillIndex((i) =>
+          i === null ? 0 : Math.min(i + 1, suggested.length - 1),
+        );
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setActivePillIndex((i) => (i === null ? 0 : Math.max(i - 1, 0)));
+        return;
+      }
+      if (e.key === "Escape" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setActivePillIndex(null);
+        return;
+      }
+      // Any printable key: drop out of pill nav and let the input handle it
+      // normally. (Don't preventDefault — we want the keystroke to land.)
+      if (e.key.length === 1) {
+        setActivePillIndex(null);
+      }
+    } else if (e.key === "ArrowUp" && stripVisible) {
+      // Only steal ↑ when the caret is on the first line of the draft.
+      // Otherwise ↑ should still navigate within multi-line content.
+      const before = inputRef.current
+        ? getTextBeforeCaret(inputRef.current)
+        : "";
+      if (!before.includes("\n")) {
+        e.preventDefault();
+        setActivePillIndex(0);
+        return;
+      }
+    }
     // Enter sends, Shift+Enter newline
     if (e.key === "Enter" && !e.shiftKey && !trigger && !plusOpen) {
       e.preventDefault();
@@ -341,13 +448,37 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
    *    (no shimmer), empty-set keeps the current chips, and the very first
    *    reveal per draft triggers a one-shot shimmer.
    */
-  const scheduleSuggestions = () => {
+  const scheduleSuggestions = (immediate = false) => {
     clearIdleTimer();
-    if (threadParentId || agentId) return;
+    // Agent pane has its own discovery flow (suggested actions on the agent
+    // intro screen) — never run heuristic chips there.
+    if (agentId) return;
     const el = inputRef.current;
     if (!el) return;
-    const text = el.innerText.trim();
-    if (text.length === 0) {
+    // Persisted dismissal for this thread (closed a chip or added-then-
+    // deleted an @mention earlier). Short-circuit before any work so the
+    // strip never appears for the rest of the session.
+    if (threadParentId && dismissedThreads[threadParentId]) {
+      if (
+        suggestStateRef.current !== "dismissed" ||
+        suggestedRef.current.length > 0
+      ) {
+        setSuggestState("dismissed");
+        setSuggested([]);
+      }
+      return;
+    }
+    const draftText = el.innerText.trim();
+    // In thread mode, fall back to the parent message text so suggestions
+    // surface as soon as the thread opens, without requiring the user to
+    // re-type the context that's already sitting right above the composer.
+    const sourceText =
+      draftText.length > 0
+        ? draftText
+        : threadParentId
+          ? parentMessageText
+          : "";
+    if (sourceText.length === 0) {
       // Fresh slate — clear everything including dismissed.
       if (
         suggestStateRef.current !== "idle" ||
@@ -359,7 +490,7 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       }
       return;
     }
-    if (text.length < SUGGEST_MIN_LENGTH) {
+    if (sourceText.length < SUGGEST_MIN_LENGTH) {
       // Drop stale ready chips; *preserve* dismissed.
       if (suggestStateRef.current === "ready") {
         setSuggestState("idle");
@@ -369,7 +500,24 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       return;
     }
     // Already has an agent pill — assume the user has self-selected.
-    if (el.querySelector('span.mention[data-user^="_"]')) {
+    const hasMention = !!el.querySelector('span.mention[data-user^="_"]');
+    if (hasMention) {
+      hadMentionRef.current = true;
+      if (
+        suggestStateRef.current !== "dismissed" ||
+        suggestedRef.current.length > 0
+      ) {
+        setSuggestState("dismissed");
+        setSuggested([]);
+      }
+      return;
+    }
+    // The "added it then deleted it" case: an @mention was present at some
+    // point and isn't anymore. That's an explicit dismissal — persist it
+    // so reopening this thread (or wiping and retyping the draft) won't
+    // resurrect the strip.
+    if (hadMentionRef.current && threadParentId) {
+      dismissThreadSuggestions(threadParentId);
       if (
         suggestStateRef.current !== "dismissed" ||
         suggestedRef.current.length > 0
@@ -383,11 +531,20 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
     // dismissed until the draft resets.
     if (suggestStateRef.current === "dismissed") return;
 
-    idleTimer.current = window.setTimeout(() => {
+    const evaluate = () => {
       const draftEl = inputRef.current;
       if (!draftEl) return;
-      const draftText = draftEl.innerText.trim();
-      const candidates = suggestAgentsForDraft(draftText);
+      const liveDraft = draftEl.innerText.trim();
+      const seedingFromParent =
+        liveDraft.length === 0 && !!threadParentId && parentMessageText.length > 0;
+      const liveSource = seedingFromParent ? parentMessageText : liveDraft;
+      // When seeding from the thread parent we relax the trigger bar to 1.
+      // Threads are an opt-in surface (the user opened it intentionally) and
+      // the heuristic is less likely to land 2 hits on a passive context
+      // sentence than on a freshly-typed action sentence.
+      const candidates = suggestAgentsForDraft(liveSource, {
+        minScore: seedingFromParent ? 1 : 2,
+      });
       const prev = suggestedRef.current;
       const nextKey = candidates.map((a) => a.id).sort().join(",");
       const prevKey = prev.map((a) => a.id).sort().join(",");
@@ -405,7 +562,15 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
       } else {
         setShimmerOnReveal(false);
       }
-    }, SUGGEST_IDLE_MS);
+    };
+
+    if (immediate) {
+      // Used for thread-open seeding: pills should be already there when the
+      // pane mounts, not appear after a beat.
+      evaluate();
+    } else {
+      idleTimer.current = window.setTimeout(evaluate, SUGGEST_IDLE_MS);
+    }
   };
 
   // Detect trigger characters
@@ -535,21 +700,35 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
   // The suggestion strip is the same component in both placements; only its
   // wrapper and `placement` prop change. We render it in either the footer
   // (inline) or above the input (above-input), based on the active variant.
-  const suggestionStripEnabled = !threadParentId && !agentId;
+  // The agent pane has its own discovery surface, so never show the strip
+  // there. Channel and thread composers both opt in.
+  const suggestionStripEnabled = !agentId;
   const renderSuggestionStrip = (placement: "inline" | "above-input") => (
     <SuggestionStrip
       state={suggestState}
       agents={suggested}
       shimmer={shimmerOnReveal}
       placement={placement}
+      // Thread chips are seeded from the parent message at mount and should
+      // appear *with* the pane, not animate in afterward. Channel composers
+      // keep the fade-up beat that pairs with the typing pause.
+      animateEntrance={!threadParentId}
+      activeIndex={activePillIndex}
       onApply={(a) => {
         insertMentionAtEnd(a);
         setSuggested((prev) => prev.filter((x) => x.id !== a.id));
+        setActivePillIndex(null);
       }}
       onDismiss={(a) => {
         setSuggested((prev) => {
           const next = prev.filter((x) => x.id !== a.id);
-          if (next.length === 0) setSuggestState("dismissed");
+          if (next.length === 0) {
+            setSuggestState("dismissed");
+            // Closing the last chip in a thread is the user telling us
+            // "not for this message" — persist so reopening doesn't bring
+            // pills back.
+            if (threadParentId) dismissThreadSuggestions(threadParentId);
+          }
           return next;
         });
       }}
@@ -561,24 +740,28 @@ export function Composer({ threadParentId, agentId, placeholder }: Props) {
 
   return (
     <div className="p-5">
-      {/* Above-input suggestion variant: pills float in the gutter ABOVE
-          the composer card itself, not inside it. That gives the chips a
-          true "hovering above the search" feel rather than reading as a
-          band attached to the top of the input. */}
-      {suggestionStripEnabled &&
-        suggestionPlacement === "above-input" &&
-        suggestState === "ready" &&
-        suggested.length > 0 && (
-          <div className="mb-2">
-            {renderSuggestionStrip("above-input")}
-          </div>
-        )}
       <div
         className={clsx(
           "relative flex flex-col rounded-lg border border-slack-border-strong bg-white",
           "focus-within:border-slack-text-muted focus-within:shadow-sm",
         )}
       >
+        {/* Above-input suggestion variant: pills float in the gutter ABOVE
+            the composer card. We position them absolutely so toggling the
+            strip doesn't change the composer's measured height — otherwise
+            the message list above re-flows / scrolls every time chips
+            appear or disappear. They're allowed to overlap the message
+            list visually since they're a transient hint. */}
+        {suggestionStripEnabled &&
+          suggestionPlacement === "above-input" &&
+          suggestState === "ready" &&
+          suggested.length > 0 && (
+            <div className="pointer-events-none absolute bottom-full left-0 right-0 mb-2 flex">
+              <div className="pointer-events-auto">
+                {renderSuggestionStrip("above-input")}
+              </div>
+            </div>
+          )}
         {showToolbar && (
           <FormattingToolbar exec={execCmd} onToggle={() => setShowToolbar(false)} />
         )}
