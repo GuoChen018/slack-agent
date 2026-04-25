@@ -123,7 +123,7 @@ export function PreflightEphemeral({ message }: Props) {
             Slackbot
           </span>
           <span className="rounded bg-[#e8e8e8] px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-slack-text-muted">
-            App
+            Agent
           </span>
           <span className="ml-1 inline-flex items-center gap-1 text-[12px] text-slack-text-light">
             <Eye size={11} className="-mt-px" />
