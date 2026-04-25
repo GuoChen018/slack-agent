@@ -1,8 +1,8 @@
 # Slack Agentic Playground
 
-A working Slack clone wrapped around a redesigned, agent-first composer.
-Built as a take-home for the prompt: _"Redesign the Slack input so it feels
-fast, intuitive, and powerful when AI agents are first-class."_
+A working Slack clone wrapped around a redesigned, agent-first composer —
+exploring what it looks like when AI agents are first-class teammates inside
+the surfaces Slack users already know (composer, `@` menu, threads).
 
 **Live demo:** https://guochen018.github.io/slack-agent/
 

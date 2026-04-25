@@ -54,6 +54,31 @@ export function MessageRow({
     (m) => m.agentStatus !== "done",
   );
 
+  // Avatars to show in the standard thread preview. We can't use
+  // `message.replyUserIds` directly: that list is populated the moment a
+  // multi-agent fan-out is scheduled (so the per-agent status pills know
+  // who's queued). `replyCount`, by contrast, only ticks up when an agent
+  // actually finishes. Deriving the avatars from messages that are done
+  // (or non-agent replies) keeps the avatar row and the count truthful.
+  const completedReplyUserIds = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const completed = Object.values(allMessages)
+      .filter(
+        (m) =>
+          m.threadId === message.id &&
+          (!m.agentStatus || m.agentStatus === "done"),
+      )
+      .sort((a, b) => a.createdAt - b.createdAt);
+    for (const m of completed) {
+      if (!seen.has(m.authorId)) {
+        seen.add(m.authorId);
+        out.push(m.authorId);
+      }
+    }
+    return out;
+  }, [allMessages, message.id]);
+
   const convsByName = useMemo(() => {
     const out: Record<string, { id: string; name: string }> = {};
     for (const c of Object.values(convs)) {
@@ -199,7 +224,7 @@ export function MessageRow({
             className="mt-1 flex w-full items-center gap-2 rounded-md border border-transparent px-1 py-1 text-[13px] hover:border-slack-border hover:bg-white"
           >
             <div className="flex gap-1">
-              {(message.replyUserIds ?? []).map((id) => (
+              {completedReplyUserIds.map((id) => (
                 <Avatar key={id} user={users[id]} size={24} rounded="md" />
               ))}
             </div>
